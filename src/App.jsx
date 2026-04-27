@@ -97,7 +97,7 @@ const styles = {
     fontFamily: "sans-serif",
   },
 
-  // --- Header & Logo ---
+  // --- Header & Logo --
   headerSection: {
     display: "flex",
     alignItems: "center",
