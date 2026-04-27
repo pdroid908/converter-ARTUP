@@ -19,18 +19,22 @@ const MenuUtama = ({ setMode }) => (
             textTransform: "none",
             letterSpacing: "normal",
             marginLeft: "10px",
+            fontSize: "0.6em", // Ukuran teks converter dibuat sedikit lebih kecil dari ARTUP
+            display: "inline-block",
           }}
         >
-          Converter 🌲
+          Converter
         </span>
       </h1>
     </div>
 
     <div style={styles.heroSection}>
-      <p style={styles.mainSubtitle}>Hanya kamu, dan Tuhan yang tahu 🔒</p>
+      <p style={styles.mainSubtitle}>
+        PRIVASI anda  aman, tidak ada data yang di kirim
+      </p>
       <p style={styles.description}>
-        Semua proses konversi terjadi secara rahasia di dalam enkripsi
-        perangkatmu sendiri.
+        Semua proses konversi terjadi di dalam
+        perangkatmu sendiri, dan selesai tanpa jejak.
       </p>
     </div>
 
@@ -39,7 +43,7 @@ const MenuUtama = ({ setMode }) => (
       <div style={styles.comparisonCardBad}>
         <span style={styles.badIcon}>❌</span>
         <p style={styles.compText}>
-          <b>Converter Lain:</b> File dikirim ke cloud, diintip server, dan
+          <b>Converter Lain:</b> File dikirim di belakang layar, diintip server, dan
           rawan bocor.
         </p>
       </div>
@@ -97,21 +101,42 @@ const styles = {
   headerSection: {
     display: "flex",
     alignItems: "center",
-    gap: "15px",
+    justifyContent: "center", // Agar rata tengah di HP
+    gap: "10px",
     marginBottom: "10px",
+    flexWrap: "wrap", // Agar icon dan teks bisa bertumpuk jika layar sangat sempit
+    width: "100%",
   },
   logoCircle: {
-    width: "50px",
-    height: "50px",
+    // Gunakan minWidth dan minHeight agar bulatannya tidak gepeng saat layar sempit
+    minWidth: "40px",
+    minHeight: "40px",
+    width: "clamp(40px, 10vw, 50px)",
+    height: "clamp(40px, 10vw, 50px)",
     borderRadius: "50%",
     background: "rgba(58, 134, 255, 0.1)",
     border: "2px solid #3a86ff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0, // KUNCI: Agar icon tidak gepeng/tertekan tulisan
   },
   logoIcon: { fontSize: "24px" },
-  title: { fontSize: "3rem", color: "#ffffff", fontWeight: "800", margin: 0 },
+  title: {
+    // Menggunakan clamp agar minimal 1.8rem dan maksimal 3rem sesuai lebar layar
+    fontSize: "clamp(1.8rem, 8vw, 3rem)",
+    fontWeight: "900",
+    color: "#3b82f6",
+    fontStyle: "italic",
+    letterSpacing: "-0.05em",
+    textTransform: "uppercase",
+    margin: 0,
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap", // Agar tulisan "Converter" bisa turun ke bawah jika tidak muat
+    justifyContent: "center",
+    textAlign: "center",
+  },
 
   // --- Subtitle Emosional ---
   heroSection: { marginBottom: "35px", textAlign: "center" },
