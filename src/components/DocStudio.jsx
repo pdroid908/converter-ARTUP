@@ -56,7 +56,10 @@ const DocStudio = ({ onBack }) => {
     } else if (fileName.endsWith(".pdf")) {
       options = [{ value: "txt", label: "Plain Text (.txt)" }];
     } else {
-      options = [{ value: "pdf", label: "PDF Document (.pdf)" }];
+      options = [
+        { value: "pdf", label: "PDF Document (.pdf)" },
+        { value: "html", label: "Web Page (.html)" }
+      ];
     }
     setDynamicOptions(options);
     setOutputFormat(options[0].value);
