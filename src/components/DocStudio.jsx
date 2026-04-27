@@ -7,34 +7,56 @@ const DocStudio = ({ onBack }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [outputFormat, setOutputFormat] = useState("pdf");
   const [dynamicOptions, setDynamicOptions] = useState([]);
+  // FUNGSI PENGAMAN: Membersihkan karakter script jahat
+  const sanitizeText = (text) => {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
     if (!selected) return;
 
+    // 1. CEK UKURAN (Maksimal 10MB agar browser tidak crash/pingsan)
+    if (selected.size > 10 * 1024 * 1024) {
+      alert("File terlalu berat! Maksimal 10MB agar sistem tidak pingsan.");
+      e.target.value = "";
+      return;
+    }
+
+    // 2. CEK MIME TYPE (Hanya terima Dokumen & Teks asli)
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+      "text/plain",
+    ];
+
+    if (!allowedTypes.includes(selected.type)) {
+      alert("Karakter file mencurigakan! ARTUP hanya menerima dokumen resmi.");
+      e.target.value = "";
+      return;
+    }
+
     setFile(selected);
     const fileName = selected.name.toLowerCase();
 
-    // Logika Smart Dropdown
+    // Logika Smart Dropdown tetap sama
     let options = [];
     if (fileName.endsWith(".docx") || fileName.endsWith(".doc")) {
       options = [
         { value: "pdf", label: "PDF Document (.pdf)" },
         { value: "txt", label: "Plain Text (.txt)" },
         { value: "html", label: "Web Page (.html)" },
-        { value: "png", label: "Convert ke Gambar (.png)" },
       ];
     } else if (fileName.endsWith(".pdf")) {
-      options = [
-        { value: "docx", label: "Word Document (.docx)" },
-        { value: "txt", label: "Plain Text (.txt)" },
-        { value: "png", label: "Convert ke Gambar (.png)" },
-      ];
+      options = [{ value: "txt", label: "Plain Text (.txt)" }];
     } else {
-      options = [
-        { value: "pdf", label: "PDF Document (.pdf)" },
-        { value: "png", label: "Convert ke Gambar (.png)" },
-      ];
+      options = [{ value: "pdf", label: "PDF Document (.pdf)" }];
     }
     setDynamicOptions(options);
     setOutputFormat(options[0].value);
@@ -44,53 +66,40 @@ const DocStudio = ({ onBack }) => {
     if (!file) return;
     setIsProcessing(true);
 
-    // Gunakan timeout agar animasi spinner sempat muncul
     setTimeout(async () => {
       try {
         const arrayBuffer = await file.arrayBuffer();
         const fileNameNoExt = file.name.split(".")[0];
 
+        // Ambil teks dari file
+        let rawText = "";
+        if (file.name.toLowerCase().endsWith(".docx")) {
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          rawText = result.value;
+        } else {
+          rawText = await file.text();
+        }
+
+        // SANITASI: Bersihkan teks dari potensi script jahat
+        const safeText = sanitizeText(rawText);
+
         if (outputFormat === "pdf") {
           const pdf = new jsPDF();
-          let text = "";
-          if (file.name.toLowerCase().endsWith(".docx")) {
-            const result = await mammoth.extractRawText({ arrayBuffer });
-            text = result.value;
-          } else {
-            text = await file.text();
-          }
-          const lines = pdf.splitTextToSize(text, 180);
+          const lines = pdf.splitTextToSize(rawText, 180); // PDF jsPDF aman secara default
           pdf.text(lines, 10, 10);
           pdf.save(`${fileNameNoExt}.pdf`);
         } else if (outputFormat === "html") {
-          // PERBAIKAN: Konversi ke HTML untuk file Word
-          if (file.name.toLowerCase().endsWith(".docx")) {
-            const result = await mammoth.convertToHtml({ arrayBuffer });
-            downloadBlob(result.value, `${fileNameNoExt}.html`, "text/html");
-          } else {
-            const text = await file.text();
-            const simpleHtml = `<html><body><pre>${text}</pre></body></html>`;
-            downloadBlob(simpleHtml, `${fileNameNoExt}.html`, "text/html");
-          }
-        } else if (outputFormat === "png") {
-          // INFO: Render PNG murni di browser butuh pdf.js
-          alert(
-            "Gunakan 'Image Studio' untuk konversi gambar. Fitur render dokumen ke foto sedang diintegrasikan.",
-          );
-        } else if (outputFormat === "txt" || outputFormat === "docx") {
-          let text = "";
-          if (file.name.toLowerCase().endsWith(".docx")) {
-            const result = await mammoth.extractRawText({ arrayBuffer });
-            text = result.value;
-          } else {
-            text = await file.text();
-          }
-          downloadBlob(text, `${fileNameNoExt}.${outputFormat}`, "text/plain");
+          // Masukkan teks yang sudah di-sanitize ke dalam template HTML
+          const simpleHtml = `<html><body style="font-family:sans-serif; padding:20px;"><pre>${safeText}</pre></body></html>`;
+          downloadBlob(simpleHtml, `${fileNameNoExt}.html`, "text/html");
+        } else if (outputFormat === "txt") {
+          downloadBlob(safeText, `${fileNameNoExt}.txt`, "text/plain");
         }
       } catch (err) {
-        alert("Gagal memproses file.");
+        console.error(err);
+        alert("Gagal meracik: File rusak atau tidak terbaca.");
       } finally {
-        setIsProcessing(false); // Memastikan animasi loading hilang
+        setIsProcessing(false);
       }
     }, 1000);
   };
@@ -165,7 +174,7 @@ const DocStudio = ({ onBack }) => {
       `}</style>
     </div>
   );
-};
+};;
 
 const styles = {
   container: {
