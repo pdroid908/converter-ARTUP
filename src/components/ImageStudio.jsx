@@ -11,21 +11,39 @@ const ImageStudio = ({ onBack }) => {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+    if (!file) return;
 
-      // Ambil dimensi asli gambar
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        setFileInfo({
-          size: file.size,
-          width: img.width,
-          height: img.height,
-        });
-      };
+    // 1. CEK UKURAN (Maksimal 15MB untuk gambar agar browser tidak hang saat upscaling)
+    if (file.size > 15 * 1024 * 1024) {
+      alert(
+        "Foto terlalu besar! Maksimal 15MB agar proses upscaling tidak pingsan.",
+      );
+      e.target.value = "";
+      return;
     }
+
+    // 2. CEK TIPE (Hanya izinkan format gambar)
+    if (!file.type.startsWith("image/")) {
+      alert(
+        "Karakter file mencurigakan! ARTUP hanya menerima file gambar asli.",
+      );
+      e.target.value = "";
+      return;
+    }
+
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+
+    // Ambil dimensi asli gambar
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      setFileInfo({
+        size: file.size,
+        width: img.width,
+        height: img.height,
+      });
+    };
   };
 
   // Fungsi menghitung estimasi ukuran (dalam MB)
@@ -42,29 +60,47 @@ const ImageStudio = ({ onBack }) => {
   };
 
   const processAndDownload = () => {
+    // PROTEKSI EKSTRA: Mencegah canvas meledak (max area biasanya ~16k pixel)
+    const finalWidth = fileInfo.width * upscale;
+    const finalHeight = fileInfo.height * upscale;
+
+    if (finalWidth > 10000 || finalHeight > 10000) {
+      alert(
+        "Hasil terlalu raksasa! Skala otomatis diturunkan demi keamanan browser.",
+      );
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
 
-    // Beri sedikit delay agar loading terlihat (dan memberi nafas buat browser)
     setTimeout(() => {
-      const img = new Image();
-      img.src = previewUrl;
-      img.onload = () => {
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext("2d");
+      try {
+        const img = new Image();
+        img.src = previewUrl;
+        img.onload = () => {
+          const canvas = canvasRef.current;
+          const ctx = canvas.getContext("2d");
 
-        canvas.width = img.width * upscale;
-        canvas.height = img.height * upscale;
+          canvas.width = finalWidth;
+          canvas.height = finalHeight;
 
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // Menjaga ketajaman gambar saat diperbesar (Ironclad Quality)
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        const link = document.createElement("a");
-        link.download = `artup-${Date.now()}.${format.split("/")[1]}`;
-        link.href = canvas.toDataURL(format, 0.9);
-        link.click();
+          const link = document.createElement("a");
+          link.download = `artup-${Date.now()}.${format.split("/")[1]}`;
+          link.href = canvas.toDataURL(format, 0.9);
+          link.click();
 
+          setIsLoading(false);
+        };
+      } catch (err) {
+        console.error(err);
+        alert("Gagal meracik foto: Pastikan format gambar benar.");
         setIsLoading(false);
-      };
+      }
     }, 500);
   };
 
