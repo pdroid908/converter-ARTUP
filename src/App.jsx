@@ -30,11 +30,11 @@ const MenuUtama = ({ setMode }) => (
 
     <div style={styles.heroSection}>
       <p style={styles.mainSubtitle}>
-        PRIVASI anda  aman, tidak ada data yang di kirim
+        PRIVASI anda aman, tidak ada data yang di kirim
       </p>
       <p style={styles.description}>
-        Semua proses konversi terjadi di dalam
-        perangkatmu sendiri, dan selesai tanpa jejak.
+        Semua proses konversi terjadi di dalam perangkatmu sendiri, dan selesai
+        tanpa jejak.
       </p>
     </div>
 
@@ -43,8 +43,8 @@ const MenuUtama = ({ setMode }) => (
       <div style={styles.comparisonCardBad}>
         <span style={styles.badIcon}>❌</span>
         <p style={styles.compText}>
-          <b>Converter Lain:</b> File dikirim di belakang layar, diintip server, dan
-          rawan bocor.
+          <b>Converter Lain:</b> File dikirim di belakang layar, diintip server,
+          kehilangan kendali atas privasi dokumen tersebut.
         </p>
       </div>
 
@@ -230,10 +230,11 @@ const styles = {
   },
 
   icon: {
-    fontSize: "80px", // Ukuran icon diperbesar dari standar
+    // 40px (HP) -> 5vw (Layar Tengah) -> 80px (Laptop)
+    fontSize: "clamp(45px, 6vw, 65px)",
     marginBottom: "20px",
     display: "block",
-    filter: "drop-shadow(0 0 10px rgba(255,255,255,0.1))", // Tambah sedikit efek glow
+    filter: "drop-shadow(0 0 10px rgba(255,255,255,0.1))",
   },
 
   cardTitle: {
