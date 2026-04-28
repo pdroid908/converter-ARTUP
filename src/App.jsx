@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import ImageStudio from "./components/ImageStudio";
 import DocStudio from "./components/DocStudio";
+import { Analytics } from "@vercel/analytics/next";
 
 const MenuUtama = ({ setMode }) => (
   <div style={styles.container}>
@@ -79,6 +80,7 @@ export default function App() {
 
   return (
     <div style={{ backgroundColor: "#0b2027", minHeight: "100vh" }}>
+      <Analytics />
       {mode === "menu" && <MenuUtama setMode={setMode} />}
       {mode === "image" && <ImageStudio onBack={() => setMode("menu")} />}
       {mode === "doc" && <DocStudio onBack={() => setMode("menu")} />}
