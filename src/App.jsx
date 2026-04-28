@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ImageStudio from "./components/ImageStudio";
 import DocStudio from "./components/DocStudio";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 
 const MenuUtama = ({ setMode }) => (
   <div style={styles.container}>
