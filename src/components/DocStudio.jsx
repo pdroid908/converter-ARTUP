@@ -7,9 +7,8 @@ const DocStudio = ({ onBack }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [outputFormat, setOutputFormat] = useState("pdf");
   const [dynamicOptions, setDynamicOptions] = useState([]);
-  const [quality, setQuality] = useState(0.8); // Slider untuk ukuran/kualitas
+  const [quality, setQuality] = useState(0.8);
 
-  // Fungsi sanitasi agar teks aman saat dikonversi ke HTML
   const sanitizeText = (text) => {
     return text
       .replace(/&/g, "&amp;")
@@ -23,7 +22,6 @@ const DocStudio = ({ onBack }) => {
     const selected = e.target.files[0];
     if (!selected) return;
 
-    // Proteksi Ukuran 10MB
     if (selected.size > 10 * 1024 * 1024) {
       alert("File terlalu berat! Maksimal 10MB kasian perangkat mu.");
       return;
@@ -32,55 +30,48 @@ const DocStudio = ({ onBack }) => {
     setFile(selected);
     const fileName = selected.name.toLowerCase();
 
-    // Logika opsi konversi pintar
     let options = [];
     if (fileName.endsWith(".docx") || fileName.endsWith(".doc")) {
       options = [
-        { value: "pdf", label: "Dokumen PDF (.pdf)" },
-        { value: "txt", label: "Teks Polos (.txt)" },
-        { value: "html", label: "Halaman Web (.html)" },
+        { value: "pdf", label: "PDF (.pdf)" },
+        { value: "txt", label: "Teks (.txt)" },
+        { value: "html", label: "Web (.html)" },
       ];
     } else if (fileName.endsWith(".pdf")) {
       options = [{ value: "txt", label: "Teks Polos (.txt)" }];
     } else {
       options = [
-        { value: "pdf", label: "Dokumen PDF (.pdf)" },
-        { value: "html", label: "Halaman Web (.html)" },
+        { value: "pdf", label: "PDF (.pdf)" },
+        { value: "html", label: "Web (.html)" },
       ];
     }
     setDynamicOptions(options);
     setOutputFormat(options[0].value);
   };
 
-  // Estimasi ukuran hasil berdasarkan slider
   const getDocEstimateSize = () => {
     if (!file) return "0 KB";
-
     let formatMultiplier = 1;
     if (outputFormat === "pdf") formatMultiplier = 1.1;
     if (outputFormat === "txt") formatMultiplier = 0.3;
     if (outputFormat === "html") formatMultiplier = 0.5;
 
     const estimatedBytes = file.size * quality * formatMultiplier;
-
-    if (estimatedBytes > 1024 * 1024) {
-      return (estimatedBytes / (1024 * 1024)).toFixed(2) + " MB";
-    } else {
-      return (estimatedBytes / 1024).toFixed(0) + " KB";
-    }
+    return estimatedBytes > 1024 * 1024
+      ? (estimatedBytes / (1024 * 1024)).toFixed(2) + " MB"
+      : (estimatedBytes / 1024).toFixed(0) + " KB";
   };
 
   const processFile = async () => {
     if (!file) return;
     setIsProcessing(true);
 
-    // Simulasi loading sebentar agar user tahu ada proses
     setTimeout(async () => {
       try {
         const arrayBuffer = await file.arrayBuffer();
         const fileNameNoExt = file.name.split(".")[0];
-
         let rawText = "";
+
         if (file.name.toLowerCase().endsWith(".docx")) {
           const result = await mammoth.extractRawText({ arrayBuffer });
           rawText = result.value;
@@ -89,28 +80,20 @@ const DocStudio = ({ onBack }) => {
         }
 
         if (outputFormat === "pdf") {
-          // Kompresi internal PDF aktif jika slider kualitas rendah
-          const pdf = new jsPDF({
-            compress: quality < 0.6 ? true : false,
-          });
-
-          // Ukuran font ikut mengecil sedikit jika user ingin file sangat kecil
-          const fontSize = 9 + quality * 3;
-          pdf.setFontSize(fontSize);
-
+          const pdf = new jsPDF({ compress: quality < 0.6 });
+          pdf.setFontSize(9 + quality * 3);
           const lines = pdf.splitTextToSize(rawText, 180);
           pdf.text(lines, 10, 10);
           pdf.save(`${fileNameNoExt}.pdf`);
         } else if (outputFormat === "html") {
           const safeText = sanitizeText(rawText);
-          const simpleHtml = `<html><body style="font-family:sans-serif; padding:20px; line-height:1.6;"><pre style="white-space:pre-wrap;">${safeText}</pre></body></html>`;
+          const simpleHtml = `<html><body style="font-family:sans-serif; padding:20px;"><pre style="white-space:pre-wrap;">${safeText}</pre></body></html>`;
           downloadBlob(simpleHtml, `${fileNameNoExt}.html`, "text/html");
         } else if (outputFormat === "txt") {
           downloadBlob(rawText, `${fileNameNoExt}.txt`, "text/plain");
         }
       } catch (err) {
-        console.error(err);
-        alert("Gagal memproses dokumen. Pastikan file tidak rusak.");
+        alert("Gagal memproses dokumen.");
       } finally {
         setIsProcessing(false);
       }
@@ -132,29 +115,16 @@ const DocStudio = ({ onBack }) => {
       <button onClick={onBack} style={styles.backBtn}>
         ← Kembali
       </button>
-      <h2
-        style={{ color: "#f9d423", textAlign: "center", marginBottom: "25px" }}
-      >
-        Document Studio 📄
-      </h2>
+      <h2 style={styles.title}>Document Studio 📄</h2>
 
       <div style={styles.card}>
         {isProcessing && (
           <div style={styles.overlay}>
             <div style={styles.spinner}></div>
-            <p
-              style={{
-                marginTop: "15px",
-                color: "#f9d423",
-                fontWeight: "bold",
-              }}
-            >
-              Sedang Mengonversi...
-            </p>
+            <p style={styles.loadingText}>Sedang Mengonversi...</p>
           </div>
         )}
 
-        {/* DROPZONE DENGAN DAFTAR FORMAT */}
         {!file ? (
           <div style={styles.dropzone}>
             <input
@@ -162,53 +132,15 @@ const DocStudio = ({ onBack }) => {
               onChange={handleFileChange}
               style={styles.fileInput}
             />
-            <p
-              style={{
-                color: "#afeeee",
-                fontWeight: "bold",
-                fontSize: "1.1rem",
-              }}
-            >
-              Klik untuk pilih dokumen
-            </p>
-            <div
-              style={{
-                marginTop: "15px",
-                borderTop: "1px solid rgba(175, 238, 238, 0.2)",
-                paddingTop: "15px",
-              }}
-            >
-              <p
-                style={{
-                  color: "rgba(175, 238, 238, 0.6)",
-                  fontSize: "0.8rem",
-                  marginBottom: "5px",
-                }}
-              >
-                Format yang didukung:
-              </p>
-              <p
-                style={{
-                  color: "#f9d423",
-                  fontSize: "0.9rem",
-                  fontWeight: "bold",
-                }}
-              >
-                .DOCX .PDF .TXT .DOC
-              </p>
+            <p style={styles.dropText}>Klik untuk pilih dokumen</p>
+            <div style={styles.formatInfo}>
+              <p style={styles.formatLabel}>Format didukung:</p>
+              <p style={styles.formatList}>.DOCX .PDF .TXT .DOC</p>
             </div>
           </div>
         ) : (
           <div style={styles.fileSelected}>
-            <p
-              style={{
-                color: "#71b280",
-                fontWeight: "bold",
-                marginBottom: "5px",
-              }}
-            >
-              📄 {file.name}
-            </p>
+            <p style={styles.fileName}>📄 {file.name}</p>
             <button onClick={() => setFile(null)} style={styles.changeBtn}>
               Ganti File
             </button>
@@ -217,13 +149,12 @@ const DocStudio = ({ onBack }) => {
 
         {file && !isProcessing && (
           <div style={styles.controls}>
-            {/* ESTIMASI UKURAN */}
             <div style={styles.infoBox}>
-              <p style={{ margin: "3px 0" }}>
-                Ukuran Asli: <b>{(file.size / 1024).toFixed(0)} KB</b>
+              <p>
+                Asli: <b>{(file.size / 1024).toFixed(0)} KB</b>
               </p>
-              <p style={{ margin: "3px 0", color: "#f9d423" }}>
-                Estimasi Hasil: <b>{getDocEstimateSize()}</b>
+              <p style={{ color: "#f9d423" }}>
+                Hasil: <b>{getDocEstimateSize()}</b>
               </p>
             </div>
 
@@ -242,7 +173,6 @@ const DocStudio = ({ onBack }) => {
               </select>
             </div>
 
-            {/* SLIDER UKURAN / KOMPRESI */}
             <div style={styles.row}>
               <label>Ukuran ({Math.round(quality * 100)}%):</label>
               <input
@@ -252,22 +182,12 @@ const DocStudio = ({ onBack }) => {
                 step="0.1"
                 value={quality}
                 onChange={(e) => setQuality(Number(e.target.value))}
-                style={{ flex: 1, marginLeft: "10px", cursor: "pointer" }}
+                style={styles.slider}
               />
             </div>
-            <p
-              style={{
-                fontSize: "0.7rem",
-                color: "rgba(175, 238, 238, 0.5)",
-                marginTop: "-10px",
-                marginBottom: "20px",
-              }}
-            >
-              *Geser ke kiri untuk memperkecil ukuran file hasil.
-            </p>
 
             <button onClick={processFile} style={styles.actionBtn}>
-              KONVERSI & DOWNLOAD SEKARANG ✅
+              KONVERSI SEKARANG ✅
             </button>
           </div>
         )}
@@ -287,6 +207,9 @@ const styles = {
     alignItems: "center",
     padding: "20px",
     width: "100%",
+    minHeight: "100vh",
+    boxSizing: "border-box", // PENTING: Agar padding tidak bocor
+    overflowX: "hidden", // PENTING: Agar tidak ada layar putih di kanan
   },
   backBtn: {
     alignSelf: "flex-start",
@@ -298,15 +221,22 @@ const styles = {
     cursor: "pointer",
     marginBottom: "20px",
   },
+  title: {
+    color: "#f9d423",
+    textAlign: "center",
+    marginBottom: "25px",
+    fontSize: "1.5rem",
+  },
   card: {
     background: "rgba(255,255,255,0.05)",
-    padding: "30px",
+    padding: "20px", // Padding dikurangi buat HP
     borderRadius: "25px",
     border: "1px solid #40798c",
     width: "100%",
     maxWidth: "480px",
     position: "relative",
     backdropFilter: "blur(10px)",
+    boxSizing: "border-box",
   },
   overlay: {
     position: "absolute",
@@ -323,20 +253,21 @@ const styles = {
     borderRadius: "25px",
   },
   spinner: {
-    width: "45px",
-    height: "45px",
+    width: "40px",
+    height: "40px",
     border: "4px solid #f9d423",
     borderTop: "4px solid transparent",
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
   },
+  loadingText: { marginTop: "15px", color: "#f9d423", fontWeight: "bold" },
   dropzone: {
     border: "2px dashed #40798c",
-    padding: "50px 20px",
+    padding: "30px 10px", // Disesuaikan lebar HP
     borderRadius: "20px",
     position: "relative",
-    background: "rgba(255,255,255,0.02)",
     textAlign: "center",
+    background: "rgba(255,255,255,0.01)",
   },
   fileInput: {
     position: "absolute",
@@ -347,57 +278,65 @@ const styles = {
     opacity: 0,
     cursor: "pointer",
   },
-  fileSelected: {
-    marginBottom: "25px",
-    background: "rgba(0,0,0,0.3)",
-    padding: "15px",
-    borderRadius: "15px",
-    border: "1px solid rgba(113, 178, 128, 0.2)",
+  dropText: { color: "#afeeee", fontWeight: "bold", fontSize: "1rem" },
+  formatInfo: {
+    marginTop: "15px",
+    borderTop: "1px solid rgba(175, 238, 238, 0.2)",
+    paddingTop: "10px",
   },
+  formatLabel: { color: "rgba(175, 238, 238, 0.6)", fontSize: "0.75rem" },
+  formatList: { color: "#f9d423", fontSize: "0.85rem", fontWeight: "bold" },
+  fileSelected: {
+    marginBottom: "20px",
+    background: "rgba(0,0,0,0.3)",
+    padding: "12px",
+    borderRadius: "15px",
+  },
+  fileName: { color: "#71b280", fontWeight: "bold", wordBreak: "break-all" }, // Agar nama file panjang tidak tembus
   changeBtn: {
     background: "none",
     border: "none",
     color: "#ff6b6b",
     cursor: "pointer",
-    fontSize: "0.85rem",
+    fontSize: "0.8rem",
     textDecoration: "underline",
   },
-  controls: { textAlign: "left" },
+  controls: { textAlign: "left", width: "100%" },
   infoBox: {
     background: "rgba(0,0,0,0.4)",
-    padding: "15px",
+    padding: "12px",
     borderRadius: "12px",
-    marginBottom: "20px",
-    fontSize: "0.9rem",
+    marginBottom: "15px",
+    fontSize: "0.85rem",
     color: "#afeeee",
-    border: "1px solid rgba(64, 121, 140, 0.3)",
   },
   row: {
-    marginBottom: "18px",
+    marginBottom: "15px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     color: "white",
+    flexWrap: "wrap",
+    gap: "10px",
   },
   input: {
-    padding: "10px",
+    padding: "8px",
     borderRadius: "10px",
     background: "#0b2027",
     color: "white",
     border: "1px solid #40798c",
-    outline: "none",
   },
+  slider: { flex: 1, minWidth: "100px", cursor: "pointer" },
   actionBtn: {
     background: "#f9d423",
     color: "#0b2027",
     border: "none",
-    padding: "18px",
+    padding: "15px",
     borderRadius: "12px",
     fontWeight: "900",
     cursor: "pointer",
     width: "100%",
-    fontSize: "1rem",
-    transition: "transform 0.2s",
+    fontSize: "0.9rem",
   },
 };
 

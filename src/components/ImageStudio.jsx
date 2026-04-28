@@ -36,14 +36,11 @@ const ImageStudio = ({ onBack }) => {
 
         canvas.width = finalWidth;
         canvas.height = finalHeight;
-
-        // Anti-alias off untuk pixel art atau on untuk foto halus
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
 
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // Export hasil ke state preview
         const resultData = canvas.toDataURL(format, quality);
         setResultPreview(resultData);
       };
@@ -54,7 +51,6 @@ const ImageStudio = ({ onBack }) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // SECURITY CHECK: Hanya izinkan file gambar asli
     if (!file.type.startsWith("image/")) {
       alert("File apa itu gass ? Bukan gambar ya !.");
       return;
@@ -80,21 +76,17 @@ const ImageStudio = ({ onBack }) => {
     };
   };
 
-  // ESTIMASI UKURAN PINTAR (KB / MB)
   const getEstimateSize = () => {
     if (!fileInfo.size) return "0 KB";
-
     let multiplier =
       format === "image/jpeg" ? 0.7 : format === "image/webp" ? 0.5 : 1.2;
     const effectiveQuality = format === "image/png" ? 1.0 : quality;
     const estimatedBytes =
       fileInfo.size * (upscale * upscale) * multiplier * effectiveQuality;
 
-    if (estimatedBytes < 1024 * 1024) {
-      return (estimatedBytes / 1024).toFixed(0) + " KB";
-    } else {
-      return (estimatedBytes / (1024 * 1024)).toFixed(2) + " MB";
-    }
+    return estimatedBytes < 1024 * 1024
+      ? (estimatedBytes / 1024).toFixed(0) + " KB"
+      : (estimatedBytes / (1024 * 1024)).toFixed(2) + " MB";
   };
 
   const handleDownload = () => {
@@ -111,11 +103,7 @@ const ImageStudio = ({ onBack }) => {
       <button onClick={onBack} style={styles.backBtn}>
         ← Kembali
       </button>
-      <h2
-        style={{ color: "#f9d423", textAlign: "center", marginBottom: "20px" }}
-      >
-        Image Studio 📸
-      </h2>
+      <h2 style={styles.title}>Image Studio 📸</h2>
 
       {!selectedFile ? (
         <div style={styles.dropzone}>
@@ -125,25 +113,9 @@ const ImageStudio = ({ onBack }) => {
             onChange={handleFileChange}
             style={styles.fileInput}
           />
-          <p style={{ color: "#afeeee", fontWeight: "bold" }}>
-            Klik untuk pilih foto
-          </p>
-          <div
-            style={{
-              marginTop: "15px",
-              borderTop: "1px solid rgba(175,238,238,0.1)",
-              paddingTop: "15px",
-            }}
-          >
-            <p
-              style={{
-                color: "#f9d423",
-                fontSize: "0.85rem",
-                fontWeight: "bold",
-              }}
-            >
-              .JPG .PNG .WEBP .JFIF .HEIC .AVIF
-            </p>
+          <p style={styles.dropText}>Klik untuk pilih foto</p>
+          <div style={styles.formatInfo}>
+            <p style={styles.formatList}>.JPG .PNG .WEBP .JFIF .HEIC .AVIF</p>
           </div>
         </div>
       ) : (
@@ -172,20 +144,20 @@ const ImageStudio = ({ onBack }) => {
             </div>
 
             <div style={styles.row}>
-              <label>Format Tujuan:</label>
+              <label>Format:</label>
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value)}
                 style={styles.input}
               >
-                <option value="image/png">PNG </option>
-                <option value="image/jpeg">JPG </option>
-                <option value="image/webp">WebP </option>
+                <option value="image/png">PNG</option>
+                <option value="image/jpeg">JPG</option>
+                <option value="image/webp">WebP</option>
               </select>
             </div>
 
             <div style={styles.row}>
-              <label>Kualitas ({Math.round(quality * 100)}%):</label>
+              <label>Kualitas:</label>
               <input
                 type="range"
                 min="0.1"
@@ -194,54 +166,29 @@ const ImageStudio = ({ onBack }) => {
                 value={quality}
                 disabled={format === "image/png"}
                 onChange={(e) => setQuality(Number(e.target.value))}
-                style={{
-                  flex: 1,
-                  marginLeft: "10px",
-                  cursor: format === "image/png" ? "not-allowed" : "pointer",
-                }}
+                style={styles.slider}
               />
             </div>
 
-            {format === "image/png" && (
-              <p
-                style={{
-                  fontSize: "0.7rem",
-                  color: "#ff6b6b",
-                  marginTop: "-10px",
-                  marginBottom: "15px",
-                  fontStyle: "italic",
-                }}
-              >
-                * PNG selalu kualitas penuh. Pilih JPG/WebP untuk kompresi.
-              </p>
-            )}
-
             <div style={styles.row}>
-              <label>Skala / Upscale:</label>
+              <label>Skala:</label>
               <select
                 value={upscale}
                 onChange={(e) => setUpscale(Number(e.target.value))}
                 style={styles.input}
               >
-                <option value="1">1x (Normal)</option>
-                <option value="2">2x (Tajam)</option>
-                <option value="4">4x (Besar)</option>
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="4">4x</option>
               </select>
             </div>
 
             <button onClick={handleDownload} style={styles.downloadBtn}>
-              SIMPAN KE PERANGKAT ✅
+              SIMPAN HASIL ✅
             </button>
             <button
               onClick={() => setSelectedFile(null)}
-              style={{
-                ...styles.downloadBtn,
-                background: "none",
-                border: "1px solid #ff6b6b",
-                color: "#ff6b6b",
-                marginTop: "10px",
-                fontSize: "0.8rem",
-              }}
+              style={styles.deleteBtn}
             >
               Hapus Foto
             </button>
@@ -258,10 +205,13 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    padding: "20px",
+    padding: "15px",
     color: "white",
-    maxWidth: "1200px",
+    width: "100%",
+    maxWidth: "100vw", // Mencegah lebar melebihi layar
     margin: "0 auto",
+    boxSizing: "border-box", // Menjaga padding tetap di dalam elemen
+    overflowX: "hidden", // Memotong bocoran ke samping
   },
   backBtn: {
     alignSelf: "flex-start",
@@ -273,15 +223,22 @@ const styles = {
     cursor: "pointer",
     marginBottom: "20px",
   },
+  title: {
+    color: "#f9d423",
+    textAlign: "center",
+    marginBottom: "20px",
+    fontSize: "1.5rem",
+  },
   dropzone: {
     border: "2px dashed #40798c",
-    padding: "50px",
+    padding: "40px 20px",
     borderRadius: "25px",
     textAlign: "center",
     width: "100%",
-    maxWidth: "500px",
+    maxWidth: "400px",
     background: "rgba(255,255,255,0.02)",
     position: "relative",
+    boxSizing: "border-box",
   },
   fileInput: {
     position: "absolute",
@@ -292,17 +249,25 @@ const styles = {
     opacity: 0,
     cursor: "pointer",
   },
+  dropText: { color: "#afeeee", fontWeight: "bold" },
+  formatInfo: {
+    marginTop: "15px",
+    borderTop: "1px solid rgba(175,238,238,0.1)",
+    paddingTop: "15px",
+  },
+  formatList: { color: "#f9d423", fontSize: "0.85rem", fontWeight: "bold" },
   mainLayout: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     gap: "20px",
     width: "100%",
+    boxSizing: "border-box",
   },
   previewContainer: {
     position: "relative",
     width: "100%",
-    maxWidth: "600px",
+    maxWidth: "500px", // Dikecilkan sedikit agar aman di HP[cite: 9]
     background: "#000",
     borderRadius: "20px",
     overflow: "hidden",
@@ -310,7 +275,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: "300px",
+    minHeight: "250px",
   },
   mainImage: {
     width: "100%",
@@ -326,24 +291,25 @@ const styles = {
     color: "#000",
     padding: "5px 12px",
     borderRadius: "8px",
-    fontSize: "0.75rem",
+    fontSize: "0.7rem",
     fontWeight: "bold",
   },
   controls: {
     background: "rgba(255,255,255,0.05)",
-    padding: "25px",
+    padding: "20px",
     borderRadius: "25px",
     width: "100%",
-    maxWidth: "420px",
+    maxWidth: "400px",
     backdropFilter: "blur(15px)",
     border: "1px solid rgba(255,255,255,0.1)",
+    boxSizing: "border-box",
   },
   infoBox: {
     background: "rgba(0,0,0,0.5)",
-    padding: "15px",
+    padding: "12px",
     borderRadius: "15px",
-    marginBottom: "20px",
-    fontSize: "0.9rem",
+    marginBottom: "15px",
+    fontSize: "0.85rem",
     color: "#afeeee",
     border: "1px solid rgba(175, 238, 238, 0.2)",
   },
@@ -352,27 +318,39 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: "15px",
+    gap: "10px",
+    flexWrap: "wrap", // Agar input tidak memaksa melebar ke kanan[cite: 9]
   },
   input: {
-    padding: "10px",
+    padding: "8px",
     borderRadius: "10px",
     border: "1px solid #40798c",
     background: "#0b2027",
     color: "white",
-    outline: "none",
   },
+  slider: { flex: 1, minWidth: "120px", cursor: "pointer" },
   downloadBtn: {
     background: "#f9d423",
     color: "#0b2027",
     border: "none",
-    padding: "16px",
+    padding: "15px",
     borderRadius: "12px",
     fontWeight: "900",
     cursor: "pointer",
     width: "100%",
-    fontSize: "1rem",
+    fontSize: "0.9rem",
     textTransform: "uppercase",
+  },
+  deleteBtn: {
+    background: "none",
+    border: "1px solid #ff6b6b",
+    color: "#ff6b6b",
+    padding: "10px",
+    borderRadius: "12px",
+    cursor: "pointer",
+    width: "100%",
+    marginTop: "10px",
+    fontSize: "0.8rem",
   },
 };
 
