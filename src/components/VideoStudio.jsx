@@ -87,37 +87,47 @@ const VideoStudio = ({ onBack }) => {
   };
 
   const runVideoProcess = async () => {
+    if (!file) return;
     const ffmpeg = ffmpegRef.current;
     setStatus("processing");
-    await ffmpeg.writeFile("input", await fetchFile(file));
 
-    await ffmpeg.exec([
-      "-i",
-      "input",
-      "-vf",
-      `scale=-2:${targetRes}:flags=fast_bilinear`, // Algoritma resize tercepat
-      "-c:v",
-      "libx264",
-      "-preset",
-      "ultrafast", // Preset prioritas kecepatan
-      "-crf",
-      "35", // File lebih kecil & beban CPU ringan
-      "-maxrate",
-      "800k", // Batas agar ukuran file tidak bengkak
-      "-bufsize",
-      "1600k",
-      "-threads",
-      "0", // Gunakan semua Core CPU (Ngebut!)
-      "-c:a",
-      "copy", // Audio dilewati (instan)
-      "output.mp4",
-    ]);
+    try {
+      // Pastikan data file terbaca
+      const fileData = await fetchFile(file);
+      await ffmpeg.writeFile("input", fileData);
 
-    const data = await ffmpeg.readFile("output.mp4");
-    setResultUrl(
-      URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" })),
-    );
-    setStatus("done");
+      await ffmpeg.exec([
+        "-i",
+        "input",
+        "-vf",
+        `scale=-2:${targetRes}:flags=fast_bilinear`,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "35",
+        "-maxrate",
+        "800k",
+        "-bufsize",
+        "1600k",
+        "-threads",
+        "0",
+        "-c:a",
+        "copy",
+        "output.mp4",
+      ]);
+
+      const data = await ffmpeg.readFile("output.mp4");
+      setResultUrl(
+        URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" })),
+      );
+      setStatus("done");
+    } catch (err) {
+      console.error("Proses gagal:", err);
+      alert("Gagal memproses video. Coba refresh halaman.");
+      setStatus("ready");
+    }
   };
 
   return (
