@@ -422,3 +422,40 @@
     justify-content: center;
   }
 }
+/* Pastikan body tidak bisa geser kanan-kiri (anti-leak) */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Perbaikan Container Utama agar tidak terlalu mepet di HP */
+.studio-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 15px; /* Kurangi padding di mobile */
+  box-sizing: border-box;
+}
+
+/* Floating Dock Responsif */
+@media (max-width: 600px) {
+  .floating-dock {
+    bottom: 0; /* Tempelkan ke bawah banget di HP */
+    width: 100%;
+    left: 0;
+    transform: none;
+    border-radius: 20px 20px 0 0; /* Lengkung atas saja */
+  }
+
+  /* Agar konten aplikasi tidak tertutup Dock saat di scroll paling bawah */
+  #center, .studio-container {
+    padding-bottom: 120px !important;
+  }
+  
+  /* Perkecil teks dock di HP agar tidak sumpek */
+  .dock-name {
+    font-size: 0.75rem;
+  }
+}
