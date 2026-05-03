@@ -76,21 +76,21 @@ const VideoStudio = ({ onBack }) => {
       "-i",
       "input",
       "-vf",
-      `scale=-2:${targetRes}:flags=fast_bilinear`, // KUNCI 1: Algoritma resize paling enteng
+      `scale=-2:${targetRes}:flags=fast_bilinear`, // Algoritma resize tercepat
       "-c:v",
       "libx264",
       "-preset",
-      "ultrafast", // KUNCI 2: Preset tanpa kompresi dalam
+      "ultrafast", // Preset prioritas kecepatan
       "-crf",
-      "35", // KUNCI 3: Nilai lebih tinggi = proses lebih ringan & file lebih kecil
+      "35", // File lebih kecil & beban CPU ringan
       "-maxrate",
-      "800k", // KUNCI 4: Batasi data agar tidak bengkak
+      "800k", // Batas agar ukuran file tidak bengkak
       "-bufsize",
       "1600k",
       "-threads",
-      "0", // KUNCI 5: Gunakan semua core CPU
+      "0", // Gunakan semua Core CPU (Ngebut!)
       "-c:a",
-      "copy", // KUNCI 6: Audio dilewati (instan)
+      "copy", // Audio dilewati (instan)
       "output.mp4",
     ]);
 
