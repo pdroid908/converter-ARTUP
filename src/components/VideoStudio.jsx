@@ -88,9 +88,19 @@ const VideoStudio = ({ onBack }) => {
   const runVideoProcess = async () => {
     if (!file) return;
     const ffmpeg = ffmpegRef.current;
-    setStatus("processing");
 
     try {
+      setStatus("processing");
+      setProgress(0);
+
+      // Pastikan file lama dihapus agar tidak bentrok
+      try {
+        await ffmpeg.deleteFile("input");
+        await ffmpeg.deleteFile("output.mp4");
+      } catch (e) {
+        /* Abaikan jika file tidak ada */
+      }
+
       const fileData = await fetchFile(file);
       await ffmpeg.writeFile("input", fileData);
 
@@ -104,7 +114,7 @@ const VideoStudio = ({ onBack }) => {
         "-preset",
         "ultrafast",
         "-crf",
-        "35",
+        "32", // Sedikit lebih tajam dari 35
         "-threads",
         "0",
         "-c:a",
@@ -113,16 +123,17 @@ const VideoStudio = ({ onBack }) => {
       ]);
 
       const data = await ffmpeg.readFile("output.mp4");
-
-      // PERBAIKAN DI SINI:
-      const videoBlob = new Blob([data.buffer], { type: "video/mp4" });
-      const url = URL.createObjectURL(videoBlob);
+      const url = URL.createObjectURL(
+        new Blob([data.buffer], { type: "video/mp4" }),
+      );
 
       setResultUrl(url);
       setStatus("done");
     } catch (err) {
-      console.error("Proses gagal:", err);
-      alert("Gagal memproses video.");
+      console.error("Proses gagal total:", err);
+      alert(
+        "Proses gagal. Pastikan browser mendukung SharedArrayBuffer (Gunakan Chrome/Edge).",
+      );
       setStatus("ready");
     }
   };
