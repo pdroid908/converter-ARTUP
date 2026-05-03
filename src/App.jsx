@@ -66,11 +66,11 @@ const MenuUtama = ({ setMode }) => (
         <p style={styles.cardDesc}>PNG, JPG, WebP & Pixel Art Upscale</p>
       </div>
 
-      <div style={styles.card} onClick={() => setMode("doc")}>
+      {/* <div style={styles.card} onClick={() => setMode("doc")}>
         <div style={styles.icon}>📄</div>
         <h2 style={styles.cardTitle}>Document Studio</h2>
         <p style={styles.cardDesc}>Word, PDF, Text & Image Conversion</p>
-      </div>
+      </div> */}
     </div>
   </div>
 );
