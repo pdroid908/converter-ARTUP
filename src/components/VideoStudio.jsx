@@ -14,6 +14,7 @@ const VideoStudio = ({ onBack }) => {
 
   // Pantau perubahan ukuran layar agar responsif
   useEffect(() => {
+    loadFFmpeg();
     const handleResize = () => setIsMobile(window.innerWidth < 800);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -56,20 +57,33 @@ const VideoStudio = ({ onBack }) => {
   };
 
   const loadFFmpeg = async () => {
-    setStatus("loading");
-    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
-    const ffmpeg = ffmpegRef.current;
-    ffmpeg.on("progress", ({ progress }) =>
-      setProgress(Math.round(progress * 100)),
-    );
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(
-        `${baseURL}/ffmpeg-core.wasm`,
-        "application/wasm",
-      ),
-    });
-    setStatus("ready");
+    // Jika sudah ready atau sedang proses, jangan muat ulang
+    if (status === "ready" || status === "processing") return;
+
+    try {
+      setStatus("loading");
+      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+      const ffmpeg = ffmpegRef.current;
+
+      ffmpeg.on("progress", ({ progress }) =>
+        setProgress(Math.round(progress * 100)),
+      );
+
+      await ffmpeg.load({
+        coreURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.js`,
+          "text/javascript",
+        ),
+        wasmURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.wasm`,
+          "application/wasm",
+        ),
+      });
+      setStatus("ready"); // Ini yang mengaktifkan tombol
+    } catch (err) {
+      console.error("FFmpeg load error:", err);
+      setStatus("idle"); // Kembalikan ke idle jika gagal agar bisa diulang
+    }
   };
 
   // Logika Estimasi Ukuran MP4 (Bitrate rata-rata)
@@ -362,8 +376,19 @@ const VideoStudio = ({ onBack }) => {
             ) : (
               <button
                 onClick={runVideoProcess}
-                disabled={status === "processing" || status === "loading"}
+                disabled={
+                  status === "loading" ||
+                  status === "processing" ||
+                  status === "idle"
+                }
                 style={{
+                  background:
+                    status === "loading" ||
+                    status === "processing" ||
+                    status === "idle"
+                      ? "#555"
+                      : "#3a86ff",
+                  color: "white",
                   background: "#3a86ff",
                   color: "white",
                   border: "none",
