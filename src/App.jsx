@@ -13,12 +13,12 @@ const MY_PROJECTS = [
     url: "https://artup-studio.vercel.app/Security",
     desc: "Scan & Protect Website",
   },
-  // {
-  //   name: "Video Resizer",
-  //   icon: "🎬",
-  //   url: "https://link-video-kamu.com",
-  //   desc: "Fast Video Compression",
-  // },
+  {
+    name: "Mini game",
+    icon: "🎬",
+    url: "https://artup-studio.vercel.app/",
+    desc: "for fun",
+  },
 ];
 
 const MenuUtama = ({ setMode }) => (
