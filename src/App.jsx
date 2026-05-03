@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import ImageStudio from "./components/ImageStudio";
 import { Analytics } from "@vercel/analytics/react";
 import "./App.css"; // Pastikan CSS diimport
-
+import AudioStudio from "./components/AudioStudio";
 
 
 // Tambahkan daftar web kamu di sini agar mudah dikelola
@@ -33,12 +33,27 @@ const MenuUtama = ({ setMode }) => (
           ARTUP<span className="brand-subtitle">Converter</span>
         </h1>
       </div>
-      
-      <p style={{ color: "#71b280", fontWeight: "500", fontStyle: "italic", margin: "10px 0 5px" }}>
+
+      <p
+        style={{
+          color: "#71b280",
+          fontWeight: "500",
+          fontStyle: "italic",
+          margin: "10px 0 5px",
+        }}
+      >
         PRIVASI anda aman, tidak ada data yang dikirim
       </p>
-      <p style={{ opacity: 0.7, fontSize: "0.9rem", maxWidth: "500px", margin: "0 auto" }}>
-        Semua proses konversi terjadi di dalam perangkatmu sendiri, dan selesai tanpa jejak.
+      <p
+        style={{
+          opacity: 0.7,
+          fontSize: "0.9rem",
+          maxWidth: "500px",
+          margin: "0 auto",
+        }}
+      >
+        Semua proses konversi terjadi di dalam perangkatmu sendiri, dan selesai
+        tanpa jejak.
       </p>
     </div>
 
@@ -47,14 +62,16 @@ const MenuUtama = ({ setMode }) => (
       <div className="comp-card bad">
         <span>❌</span>
         <p className="comp-text">
-          <b>Converter Lain:</b> File dikirim ke server, diintip, dan berisiko bocor.
+          <b>Converter Lain:</b> File dikirim ke server, diintip, dan berisiko
+          bocor.
         </p>
       </div>
 
       <div className="comp-card good">
         <span>✅</span>
         <p className="comp-text">
-          <b>ARTUP:</b> 100% eksekusi lokal. File tidak pernah meninggalkan browsermu.
+          <b>ARTUP:</b> 100% eksekusi lokal. File tidak pernah meninggalkan
+          browsermu.
         </p>
       </div>
     </div>
@@ -69,10 +86,15 @@ const MenuUtama = ({ setMode }) => (
         </p>
       </div>
 
-      
+      {/* Audio Studio Card (Baru) */}
+      <div className="menu-card" onClick={() => setMode("audio")}>
+        <span className="icon">🎵</span>
+        <h2 style={{ color: "white", margin: "0 0 10px" }}>Audio Studio</h2>
+        <p style={{ color: "#afeeee", opacity: 0.8, fontSize: "0.9rem" }}>
+          Ekstrak Audio dari Video (MP4 to WAV)
+        </p>
+      </div>
     </div>
-
-    
   </div>
 );
 
@@ -116,6 +138,7 @@ export default function App() {
 
       {mode === "menu" && <MenuUtama setMode={setMode} />}
       {mode === "image" && <ImageStudio onBack={() => setMode("menu")} />}
+      {mode === "audio" && <AudioStudio onBack={() => setMode("menu")} />}
     </div>
   );
 }
