@@ -27,37 +27,21 @@ const VideoStudio = ({ onBack }) => {
       setResultUrl(null);
       setProgress(0);
 
+      // Paksa pancing durasi
       const video = document.createElement("video");
       video.preload = "metadata";
-
       video.onloadedmetadata = () => {
-        // Pancingan: Jika durasi tidak terbaca (0 atau Infinity), paksa browser mencari
-        if (video.duration === Infinity || video.duration === 0) {
-          video.currentTime = 1e101;
-          video.ontimeupdate = () => {
-            video.ontimeupdate = null;
-            setDuration(video.duration);
-            video.currentTime = 0;
-          };
-        } else {
-          setDuration(video.duration);
-        }
+        setDuration(video.duration);
+        // Jika mesin sudah ready, biarkan ready. Jika belum, load.
+        if (status === "idle") loadFFmpeg();
+        else if (status !== "loading" && status !== "processing")
+          setStatus("ready");
       };
-
-      video.onerror = () => {
-        console.error("Gagal memuat video");
-        setDuration(0);
-      };
-
-      // Gunakan URL sementara untuk ambil durasi
       video.src = URL.createObjectURL(selected);
-
-      if (status === "idle") loadFFmpeg();
     }
   };
 
   const loadFFmpeg = async () => {
-    // Jika sudah ready atau sedang proses, jangan muat ulang
     if (status === "ready" || status === "processing") return;
 
     try {
@@ -79,10 +63,11 @@ const VideoStudio = ({ onBack }) => {
           "application/wasm",
         ),
       });
-      setStatus("ready"); // Ini yang mengaktifkan tombol
+
+      setStatus("ready"); // MENGAKTIFKAN TOMBOL
     } catch (err) {
       console.error("FFmpeg load error:", err);
-      setStatus("idle"); // Kembalikan ke idle jika gagal agar bisa diulang
+      setStatus("idle"); // Reset agar bisa coba lagi
     }
   };
 
