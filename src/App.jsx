@@ -3,6 +3,7 @@ import ImageStudio from "./components/ImageStudio";
 import { Analytics } from "@vercel/analytics/react";
 import "./App.css"; // Pastikan CSS diimport
 import AudioStudio from "./components/AudioStudio";
+import VideoStudio from "./components/VideoStudio";
 
 
 // Tambahkan daftar web kamu di sini agar mudah dikelola
@@ -91,7 +92,16 @@ const MenuUtama = ({ setMode }) => (
         <span className="icon">🎵</span>
         <h2 style={{ color: "white", margin: "0 0 10px" }}>Audio Studio</h2>
         <p style={{ color: "#afeeee", opacity: 0.8, fontSize: "0.9rem" }}>
-          Ekstrak Audio dari Video (MP4 to WAV)
+          Ekstrak Audio dari Video (MP4 to WAV/mp3)
+        </p>
+      </div>
+
+      {/* Audio Studio Card (Baru) */}
+      <div className="menu-card" onClick={() => setMode("video")}>
+        <span className="icon">🎬</span>
+        <h2 style={{ color: "white", margin: "0 0 10px" }}>Video Studio</h2>
+        <p style={{ color: "#afeeee", opacity: 0.8, fontSize: "0.9rem" }}>
+          Resize ukuran video offline no data
         </p>
       </div>
     </div>
@@ -139,6 +149,7 @@ export default function App() {
       {mode === "menu" && <MenuUtama setMode={setMode} />}
       {mode === "image" && <ImageStudio onBack={() => setMode("menu")} />}
       {mode === "audio" && <AudioStudio onBack={() => setMode("menu")} />}
+      {mode === "video" && <VideoStudio onBack={() => setMode("menu")} />}
     </div>
   );
 }
