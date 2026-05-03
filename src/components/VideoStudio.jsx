@@ -91,7 +91,6 @@ const VideoStudio = ({ onBack }) => {
     setStatus("processing");
 
     try {
-      // Pastikan data file terbaca
       const fileData = await fetchFile(file);
       await ffmpeg.writeFile("input", fileData);
 
@@ -106,10 +105,6 @@ const VideoStudio = ({ onBack }) => {
         "ultrafast",
         "-crf",
         "35",
-        "-maxrate",
-        "800k",
-        "-bufsize",
-        "1600k",
         "-threads",
         "0",
         "-c:a",
@@ -118,13 +113,16 @@ const VideoStudio = ({ onBack }) => {
       ]);
 
       const data = await ffmpeg.readFile("output.mp4");
-      setResultUrl(
-        URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" })),
-      );
+
+      // PERBAIKAN DI SINI:
+      const videoBlob = new Blob([data.buffer], { type: "video/mp4" });
+      const url = URL.createObjectURL(videoBlob);
+
+      setResultUrl(url);
       setStatus("done");
     } catch (err) {
       console.error("Proses gagal:", err);
-      alert("Gagal memproses video. Coba refresh halaman.");
+      alert("Gagal memproses video.");
       setStatus("ready");
     }
   };
