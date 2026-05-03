@@ -47,7 +47,8 @@ const VideoStudio = ({ onBack }) => {
 
     try {
       setStatus("loading");
-      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+      const baseURL =
+        "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
       const ffmpeg = ffmpegRef.current;
 
       // Log untuk memantau apakah mesin benar-benar jalan
