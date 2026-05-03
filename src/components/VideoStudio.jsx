@@ -42,12 +42,16 @@ const VideoStudio = ({ onBack }) => {
   };
 
   const loadFFmpeg = async () => {
-    if (status === "ready" || status === "processing") return;
+    // Jika sedang loading atau sudah ready, jangan panggil lagi
+    if (status === "loading" || status === "ready") return;
 
     try {
       setStatus("loading");
       const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
       const ffmpeg = ffmpegRef.current;
+
+      // Log untuk memantau apakah mesin benar-benar jalan
+      ffmpeg.on("log", ({ message }) => console.log("FFmpeg:", message));
 
       ffmpeg.on("progress", ({ progress }) =>
         setProgress(Math.round(progress * 100)),
@@ -64,10 +68,10 @@ const VideoStudio = ({ onBack }) => {
         ),
       });
 
-      setStatus("ready"); // MENGAKTIFKAN TOMBOL
+      setStatus("ready");
     } catch (err) {
-      console.error("FFmpeg load error:", err);
-      setStatus("idle"); // Reset agar bisa coba lagi
+      console.error("Gagal muat FFmpeg:", err);
+      setStatus("idle"); // Reset agar tombol bisa diklik lagi
     }
   };
 
@@ -86,37 +90,34 @@ const VideoStudio = ({ onBack }) => {
   };
 
   const runVideoProcess = async () => {
-    if (!file) return;
-    const ffmpeg = ffmpegRef.current;
+    if (!file || status !== "ready") return; // Pastikan status sudah ready
 
+    const ffmpeg = ffmpegRef.current;
     try {
       setStatus("processing");
       setProgress(0);
 
-      // Pastikan file lama dihapus agar tidak bentrok
+      // PENTING: Hapus file lama di memori FFmpeg agar tidak Error "File already exists"
       try {
         await ffmpeg.deleteFile("input");
         await ffmpeg.deleteFile("output.mp4");
-      } catch (e) {
-        /* Abaikan jika file tidak ada */
-      }
+      } catch (e) {}
 
       const fileData = await fetchFile(file);
       await ffmpeg.writeFile("input", fileData);
 
+      // Gunakan settingan yang lebih stabil untuk browser
       await ffmpeg.exec([
         "-i",
         "input",
         "-vf",
-        `scale=-2:${targetRes}:flags=fast_bilinear`,
+        `scale=-2:${targetRes}`,
         "-c:v",
         "libx264",
         "-preset",
         "ultrafast",
         "-crf",
-        "32", // Sedikit lebih tajam dari 35
-        "-threads",
-        "0",
+        "30",
         "-c:a",
         "copy",
         "output.mp4",
@@ -130,10 +131,8 @@ const VideoStudio = ({ onBack }) => {
       setResultUrl(url);
       setStatus("done");
     } catch (err) {
-      console.error("Proses gagal total:", err);
-      alert(
-        "Proses gagal. Pastikan browser mendukung SharedArrayBuffer (Gunakan Chrome/Edge).",
-      );
+      console.error("Proses gagal:", err);
+      alert("Gagal memproses video. Pastikan koneksi stabil.");
       setStatus("ready");
     }
   };
