@@ -11,6 +11,7 @@ const VideoStudio = ({ onBack }) => {
   const [duration, setDuration] = useState(0);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 800);
   const ffmpegRef = useRef(new FFmpeg());
+  
 
   // Pantau perubahan ukuran layar agar responsif
   useEffect(() => {
@@ -49,6 +50,18 @@ const VideoStudio = ({ onBack }) => {
       setStatus("loading");
       const baseURL =
         "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
+      const time = Date.now(); // Tambahkan ini
+
+      await ffmpeg.load({
+        coreURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.js?v=${time}`,
+          "text/javascript",
+        ),
+        wasmURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.wasm?v=${time}`,
+          "application/wasm",
+        ),
+      });
       const ffmpeg = ffmpegRef.current;
 
       // Log untuk memantau apakah mesin benar-benar jalan
