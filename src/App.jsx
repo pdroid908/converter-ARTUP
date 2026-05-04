@@ -101,7 +101,7 @@ const MenuUtama = ({ setMode }) => (
         <span className="icon">🎬</span>
         <h2 style={{ color: "white", margin: "0 0 10px" }}>Video Studio</h2>
         <p style={{ color: "#afeeee", opacity: 0.8, fontSize: "0.9rem" }}>
-          Resize ukuran video offline no data
+          Resize video tanpa memakan data
         </p>
       </div>
     </div>

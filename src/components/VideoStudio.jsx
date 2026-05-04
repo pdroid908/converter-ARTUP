@@ -21,37 +21,47 @@ const VideoStudio = ({ onBack }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    if (selected) {
-      setFile(selected);
-      setResultUrl(null);
-      setProgress(0);
+ const handleFileChange = (e) => {
+   const selected = e.target.files[0];
+   if (selected) {
+     setFile(selected);
+     setResultUrl(null);
+     setProgress(0);
 
-      // Paksa pancing durasi
-      const video = document.createElement("video");
-      video.preload = "metadata";
-      video.onloadedmetadata = () => {
-        setDuration(video.duration);
-        // Jika mesin sudah ready, biarkan ready. Jika belum, load.
-        if (status === "idle") loadFFmpeg();
-        else if (status !== "loading" && status !== "processing")
-          setStatus("ready");
-      };
-      video.src = URL.createObjectURL(selected);
-    }
-  };
+     // Kita set status ke loading agar tombol menampilkan "Menyiapkan Mesin"
+     setStatus("loading");
+
+     const video = document.createElement("video");
+     video.preload = "metadata";
+     video.onloadedmetadata = async () => {
+       setDuration(video.duration);
+       // Tunggu FFmpeg benar-benar siap dimuat
+       await loadFFmpeg();
+     };
+     video.src = URL.createObjectURL(selected);
+   }
+ };
 
   const loadFFmpeg = async () => {
-    // Jika sedang loading atau sudah ready, jangan panggil lagi
     if (status === "loading" || status === "ready") return;
 
     try {
       setStatus("loading");
+
+      // Ambil instance dari ref di awal fungsi
+      const ffmpeg = ffmpegRef.current;
+
       const baseURL =
         "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
-      const time = Date.now(); // Tambahkan ini
+      const time = Date.now();
 
+      // Pasang event listener SEBELUM load
+      ffmpeg.on("log", ({ message }) => console.log("FFmpeg:", message));
+      ffmpeg.on("progress", ({ progress }) =>
+        setProgress(Math.round(progress * 100)),
+      );
+
+      // Cukup panggil load satu kali
       await ffmpeg.load({
         coreURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.js?v=${time}`,
@@ -62,30 +72,12 @@ const VideoStudio = ({ onBack }) => {
           "application/wasm",
         ),
       });
-      const ffmpeg = ffmpegRef.current;
-
-      // Log untuk memantau apakah mesin benar-benar jalan
-      ffmpeg.on("log", ({ message }) => console.log("FFmpeg:", message));
-
-      ffmpeg.on("progress", ({ progress }) =>
-        setProgress(Math.round(progress * 100)),
-      );
-
-      await ffmpeg.load({
-        coreURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.js`,
-          "text/javascript",
-        ),
-        wasmURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.wasm`,
-          "application/wasm",
-        ),
-      });
 
       setStatus("ready");
+      console.log("FFmpeg Ready!");
     } catch (err) {
       console.error("Gagal muat FFmpeg:", err);
-      setStatus("idle"); // Reset agar tombol bisa diklik lagi
+      setStatus("idle");
     }
   };
 
@@ -383,35 +375,31 @@ const VideoStudio = ({ onBack }) => {
             ) : (
               <button
                 onClick={runVideoProcess}
-                disabled={
-                  status === "loading" ||
-                  status === "processing" ||
-                  status === "idle"
-                }
+                // Tombol HANYA mati jika sedang loading atau sedang memproses
+                disabled={status === "loading" || status === "processing"}
                 style={{
                   background:
-                    status === "loading" ||
-                    status === "processing" ||
-                    status === "idle"
+                    status === "loading" || status === "processing"
                       ? "#555"
                       : "#3a86ff",
-                  color: "white",
-                  background: "#3a86ff",
                   color: "white",
                   border: "none",
                   padding: "15px",
                   borderRadius: "12px",
                   fontWeight: "bold",
-                  cursor: "pointer",
+                  cursor:
+                    status === "loading" || status === "processing"
+                      ? "not-allowed"
+                      : "pointer",
                   opacity:
-                    status === "processing" || status === "loading" ? 0.5 : 1,
+                    status === "processing" || status === "loading" ? 0.6 : 1,
                   fontSize: "1rem",
                 }}
               >
                 {status === "loading"
                   ? "Menyiapkan Mesin..."
                   : status === "processing"
-                    ? "Mengecilkan..."
+                    ? `Mengecilkan (${progress}%)`
                     : "MULAI RESIZE ⚡"}
               </button>
             )}
