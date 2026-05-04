@@ -47,34 +47,26 @@ const VideoStudio = ({ onBack }) => {
 
     try {
       setStatus("loading");
-
-      // Ambil instance dari ref di awal fungsi
       const ffmpeg = ffmpegRef.current;
-
       const baseURL =
         "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
-      const time = Date.now();
 
-      // Pasang event listener SEBELUM load
       ffmpeg.on("log", ({ message }) => console.log("FFmpeg:", message));
       ffmpeg.on("progress", ({ progress }) =>
         setProgress(Math.round(progress * 100)),
       );
 
-      // Cukup panggil load satu kali
+      // PERBAIKAN: Langsung arahkan coreURL ke link CDN (tanpa toBlobURL)
+      // agar browser bisa mengenalinya sebagai module
       await ffmpeg.load({
-        coreURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.js?v=${time}`,
-          "text/javascript",
-        ),
+        coreURL: `${baseURL}/ffmpeg-core.js`,
         wasmURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.wasm?v=${time}`,
+          `${baseURL}/ffmpeg-core.wasm`,
           "application/wasm",
         ),
       });
 
       setStatus("ready");
-      console.log("FFmpeg Ready!");
     } catch (err) {
       console.error("Gagal muat FFmpeg:", err);
       setStatus("idle");
