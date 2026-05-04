@@ -8,7 +8,7 @@ const AudioStudio = ({ onBack }) => {
   const [format, setFormat] = useState("audio/wav"); // Default ke WAV (mudah)
   const [quality, setQuality] = useState(0.8); // Skala 0.1 - 1.0
   const [duration, setDuration] = useState(0);
-
+  const [progress, setProgress] = useState(0); // <-- TAMBAHKAN INI
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile && selectedFile.type.startsWith("video/")) {
@@ -47,6 +47,7 @@ const AudioStudio = ({ onBack }) => {
   const processAudio = async () => {
     if (!file) return;
     setIsProcessing(true);
+    setProgress(5); // Start awal
 
     try {
       const audioContext = new (
@@ -55,27 +56,35 @@ const AudioStudio = ({ onBack }) => {
       const arrayBuffer = await file.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      let blob =
-        format === "audio/wav"
-          ? bufferToWav(audioBuffer)
-          : bufferToMp3(audioBuffer);
+      setProgress(20); // Selesai decode
 
-      // CEK DISINI: Jangan jalankan createObjectURL jika blob null
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
+      // LANGKAH 1: Selalu buat WAV dulu (sebagai Buffer Penengah/Master)
+      const wavBlob = bufferToWav(audioBuffer);
+
+      if (format === "audio/wav") {
+        setAudioUrl(URL.createObjectURL(wavBlob));
+        setProgress(100);
       } else {
-        alert("Gagal membuat file audio. Cek konsol browser.");
-      }
+        // LANGKAH 2: Jika user pilih MP3, konversi dari audioBuffer tadi secara Async
+        const mp3Blob = await bufferToMp3Async(audioBuffer, (p) => {
+          // Kita petakan progress konversi ke visual 20% sampai 100%
+          setProgress(20 + Math.floor(p * 0.8));
+        });
 
-      setIsProcessing(false);
+        if (mp3Blob) {
+          setAudioUrl(URL.createObjectURL(mp3Blob));
+        } else {
+          alert("Gagal MP3, menggunakan cadangan WAV.");
+          setAudioUrl(URL.createObjectURL(wavBlob));
+        }
+      }
     } catch (error) {
-      console.error("Proses audio gagal:", error);
+      console.error("Proses gagal:", error);
       alert("Gagal memproses audio.");
+    } finally {
       setIsProcessing(false);
     }
   };
-
   const cardStyle = {
     background: "rgba(255,255,255,0.05)",
     padding: "20px",
@@ -134,24 +143,17 @@ const AudioStudio = ({ onBack }) => {
   };
 
   // 2. Gunakan fungsi bufferToMp3 yang sudah diperbaiki total
-  const bufferToMp3 = (audioBuffer) => {
-    // Langsung ambil dari window, jangan pakai helper lain
+  const bufferToMp3Async = async (audioBuffer, onProgress) => {
     const lame = window.lamejs;
-
-    if (!lame) {
-      alert("Library MP3 gagal dimuat dari folder public. Cek index.html!");
-      return null;
-    }
-
-    // Pancingan variabel global untuk library lamejs
-    window.MPEGMode = { STEREO: 0, JOINT_STEREO: 1, DUAL_CHANNEL: 2, MONO: 3 };
-    window.Lame = lame.Lame;
+    if (!lame) return null;
 
     const channels = audioBuffer.numberOfChannels;
-    const sampleRate = audioBuffer.sampleRate;
     const kbps = Math.round(128 + 192 * parseFloat(quality));
-
-    const mp3encoder = new lame.Mp3Encoder(channels, sampleRate, kbps);
+    const mp3encoder = new lame.Mp3Encoder(
+      channels,
+      audioBuffer.sampleRate,
+      kbps,
+    );
     const mp3Data = [];
 
     const floatToInt16 = (samples) => {
@@ -175,12 +177,19 @@ const AudioStudio = ({ onBack }) => {
         channels === 2
           ? mp3encoder.encodeBuffer(leftChunk, rightChunk)
           : mp3encoder.encodeBuffer(leftChunk);
+
       if (mp3buf.length > 0) mp3Data.push(mp3buf);
+
+      // Update progress setiap 100 blok
+      if (i % (blockSize * 100) === 0) {
+        onProgress(Math.round((i / left.length) * 100));
+        await new Promise((resolve) => setTimeout(resolve, 0)); // Cegah Freeze
+      }
     }
 
     const flush = mp3encoder.flush();
     if (flush.length > 0) mp3Data.push(flush);
-
+    onProgress(100);
     return new Blob(mp3Data, { type: "audio/mp3" });
   };
   return (
@@ -316,6 +325,39 @@ const AudioStudio = ({ onBack }) => {
                 <p style={{ color: "#71b280", fontSize: "0.8rem" }}>
                   Durasi: {Math.floor(duration)} detik
                 </p>
+
+                {/* TEMPELKAN KODE PROGRESS DI SINI */}
+                {isProcessing && (
+                  <div style={{ marginTop: "20px", textAlign: "left" }}>
+                    <p
+                      style={{
+                        color: "#f9d423",
+                        fontSize: "0.8rem",
+                        marginBottom: "5px",
+                      }}
+                    >
+                      Sedang Mengolah: {progress}%
+                    </p>
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "8px",
+                        background: "rgba(255,255,255,0.1)",
+                        borderRadius: "10px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${progress}%`,
+                          height: "100%",
+                          background: "#71b280",
+                          transition: "width 0.3s ease",
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
               </div>
               {audioUrl && (
                 <div style={{ animation: "fadeIn 0.5s" }}>
