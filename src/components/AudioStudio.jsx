@@ -1,5 +1,8 @@
 import React, { useState, useRef } from "react";
 
+
+// Tambahkan ini tepat di bawah import lamejs
+
 const AudioStudio = ({ onBack }) => {
   const [file, setFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -54,17 +57,19 @@ const AudioStudio = ({ onBack }) => {
       const arrayBuffer = await file.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      // Catatan: Untuk MP3 asli di browser (client-side) tanpa library berat seperti FFmpeg,
-      // biasanya kita butuh library 'lamejs'. Untuk 2fase ini kita buat jalurnya dulu.
-      const blob =
-        format === "audio/wav"
-          ? bufferToWav(audioBuffer)
-          : bufferToWav(audioBuffer); // Placeholder MP3
+      let blob;
+      if (format === "audio/wav") {
+        blob = bufferToWav(audioBuffer);
+      } else {
+        // PROSES MP3 SUNGGUHAN
+        blob = bufferToMp3(audioBuffer);
+      }
 
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
       setIsProcessing(false);
     } catch (error) {
+      console.error(error);
       alert("Gagal memproses audio.");
       setIsProcessing(false);
     }
@@ -118,7 +123,62 @@ const AudioStudio = ({ onBack }) => {
     }
     return new Blob([buffer], { type: "audio/wav" });
   };
+  // Gunakan pengecekan window untuk mengambil library dari CDN
+  const getLame = () => {
+    if (typeof window !== "undefined" && window.lamejs) {
+      return window.lamejs;
+    }
+    return null;
+  };
 
+  const bufferToMp3 = (audioBuffer) => {
+    const lame = getLame();
+    if (!lame) {
+      alert("Library pemroses MP3 belum siap. Silakan refresh.");
+      return null;
+    }
+
+    const channels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    const kbps = Math.round(128 + 192 * parseFloat(quality));
+
+    // Inisialisasi menggunakan objek global
+    const mp3encoder = new lame.Mp3Encoder(channels, sampleRate, kbps);
+    const mp3Data = [];
+
+    const floatToInt16 = (floatSamples) => {
+      const int16 = new Int16Array(floatSamples.length);
+      for (let i = 0; i < floatSamples.length; i++) {
+        let s = Math.max(-1, Math.min(1, floatSamples[i]));
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      return int16;
+    };
+
+    const left = floatToInt16(audioBuffer.getChannelData(0));
+    const right =
+      channels > 1 ? floatToInt16(audioBuffer.getChannelData(1)) : left;
+
+    const sampleBlockSize = 1152;
+    for (let i = 0; i < left.length; i += sampleBlockSize) {
+      const leftChunk = left.subarray(i, i + sampleBlockSize);
+      const rightChunk = right.subarray(i, i + sampleBlockSize);
+
+      let mp3buf;
+      if (channels === 2) {
+        mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+      } else {
+        mp3buf = mp3encoder.encodeBuffer(leftChunk);
+      }
+
+      if (mp3buf.length > 0) mp3Data.push(mp3buf);
+    }
+
+    const mp3buf = mp3encoder.flush();
+    if (mp3buf.length > 0) mp3Data.push(mp3buf);
+
+    return new Blob(mp3Data, { type: "audio/mp3" });
+  };
   return (
     <div className="studio-container">
       <button
@@ -145,6 +205,56 @@ const AudioStudio = ({ onBack }) => {
 
       <div
         style={{
+          marginTop: "50px",
+          padding: "1px", // Ruang untuk gradient border
+          background:
+            "linear-gradient(90deg, transparent, rgba(113, 178, 128, 0.5), transparent)",
+          borderRadius: "20px",
+          width: "fit-content",
+          marginInline: "auto",
+          animation: "pulse 3s infinite", // Menggunakan keyframe pulse yang sudah ada di App.css kamu
+          boxShadow: "0 0 20px rgba(113, 178, 128, 0.1)",
+        }}
+      >
+        <div
+          style={{
+            background: "#0b2027", // Warna dasar gelap webmu
+            padding: "15px 30px",
+            borderRadius: "20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "15px",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "1.2rem",
+              filter: "drop-shadow(0 0 5px #71b280)",
+            }}
+          >
+            🛡️
+          </span>
+          <p
+            style={{
+              fontSize: "0.75rem",
+              color: "#ffffff",
+              margin: 0,
+              fontWeight: "500",
+              letterSpacing: "0.5px",
+              opacity: 0.8,
+            }}
+          >
+            <span style={{ color: "#71b280", fontWeight: "800" }}>
+              PEMBERITAHUAN:
+            </span>{" "}
+            Kami tidak mendukung penggunaan karya berhak cipta tanpa izin untuk
+            tujuan komersial.
+          </p>
+        </div>
+      </div>
+      <div
+        style={{
           display: "grid",
           // Gunakan grid-template-columns otomatis:
           // Jika layar lebar (>800px) pakai 1fr 350px, jika sempit tumpuk ke bawah
@@ -166,8 +276,6 @@ const AudioStudio = ({ onBack }) => {
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            
-            
           }}
         >
           {!file ? (
@@ -243,7 +351,6 @@ const AudioStudio = ({ onBack }) => {
                 Format Output
               </label>
               <select
-                
                 value={format}
                 onChange={(e) => setFormat(e.target.value)}
                 style={{
@@ -358,6 +465,6 @@ const AudioStudio = ({ onBack }) => {
       </div>
     </div>
   );
-};
+};;
 
 export default AudioStudio;
