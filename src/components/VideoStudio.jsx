@@ -49,17 +49,17 @@ const VideoStudio = ({ onBack }) => {
     try {
       setStatus("loading");
       const ffmpeg = ffmpegRef.current;
+
+      // Gunakan URL langsung untuk ESM core agar tidak diblokir sebagai 'blob'
       const baseURL =
         "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
 
-      // Gunakan listener untuk memantau jika ada error internal
       ffmpeg.on("log", ({ message }) => console.log("FFmpeg Log:", message));
 
+      // PERBAIKAN: coreURL langsung mengarah ke string URL, bukan toBlobURL
+      // Ini lebih kompatibel dengan kebijakan keamanan Vercel
       await ffmpeg.load({
-        coreURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.js`,
-          "text/javascript",
-        ),
+        coreURL: `${baseURL}/ffmpeg-core.js`,
         wasmURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.wasm`,
           "application/wasm",
@@ -70,9 +70,9 @@ const VideoStudio = ({ onBack }) => {
       console.log("Mesin FFmpeg Siap!");
     } catch (err) {
       console.error("Gagal muat FFmpeg:", err);
-      setStatus("idle"); // Kembali ke idle agar bisa dicoba lagi
+      setStatus("idle");
       alert(
-        "Gagal menyiapkan mesin. Pastikan koneksi internet stabil atau coba refresh halaman.",
+        "Gagal menyiapkan mesin. Coba buka di Tab Penyamaran (Incognito) atau bersihkan cache browser kamu.",
       );
     }
   };
