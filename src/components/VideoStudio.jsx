@@ -4,62 +4,36 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
 const VideoStudio = ({ onBack }) => {
   const [file, setFile] = useState(null);
-  const [status, setStatus] = useState("idle");
+  const [status, setStatus] = useState("idle"); // idle, loading, ready, processing, done
   const [progress, setProgress] = useState(0);
   const [resultUrl, setResultUrl] = useState(null);
-  const [targetRes, setTargetRes] = useState("720");
-  const [duration, setDuration] = useState(0);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 800);
+  const [targetRes, setTargetRes] = useState("720"); // Default 720p
   const ffmpegRef = useRef(new FFmpeg());
-  
 
-  // Pantau perubahan ukuran layar agar responsif
   useEffect(() => {
     loadFFmpeg();
-    const handleResize = () => setIsMobile(window.innerWidth < 800);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
- const handleFileChange = (e) => {
-   const selected = e.target.files[0];
-   if (selected) {
-     setFile(selected);
-     setResultUrl(null);
-     setProgress(0);
-
-     // Kita set status ke loading agar tombol menampilkan "Menyiapkan Mesin"
-     setStatus("loading");
-
-     const video = document.createElement("video");
-     video.preload = "metadata";
-     video.onloadedmetadata = async () => {
-       setDuration(video.duration);
-       // Tunggu FFmpeg benar-benar siap dimuat
-       await loadFFmpeg();
-     };
-     video.src = URL.createObjectURL(selected);
-   }
- };
-
   const loadFFmpeg = async () => {
-    // Jika sudah ready, jangan muat ulang
     if (status === "ready") return;
-
     try {
       setStatus("loading");
       const ffmpeg = ffmpegRef.current;
 
-      // Gunakan URL langsung untuk ESM core agar tidak diblokir sebagai 'blob'
+      // Menggunakan CDN jsDelivr yang stabil untuk FFmpeg Core
       const baseURL =
         "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
 
       ffmpeg.on("log", ({ message }) => console.log("FFmpeg Log:", message));
+      ffmpeg.on("progress", ({ progress }) => {
+        setProgress(Math.round(progress * 100));
+      });
 
-      // PERBAIKAN: coreURL langsung mengarah ke string URL, bukan toBlobURL
-      // Ini lebih kompatibel dengan kebijakan keamanan Vercel
       await ffmpeg.load({
-        coreURL: `${baseURL}/ffmpeg-core.js`,
+        coreURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.js`,
+          "text/javascript",
+        ),
         wasmURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.wasm`,
           "application/wasm",
@@ -67,70 +41,55 @@ const VideoStudio = ({ onBack }) => {
       });
 
       setStatus("ready");
-      console.log("Mesin FFmpeg Siap!");
     } catch (err) {
       console.error("Gagal muat FFmpeg:", err);
       setStatus("idle");
       alert(
-        "Gagal menyiapkan mesin. Coba buka di Tab Penyamaran (Incognito) atau bersihkan cache browser kamu.",
+        "Gagal menyiapkan mesin browser. Coba refresh atau gunakan Google Chrome.",
       );
     }
   };
 
-  // Logika Estimasi Ukuran MP4 (Bitrate rata-rata)
-  const getEstimateSize = () => {
-    if (!duration) return "Calculating...";
-    let bitrate; // dalam kbps
-    if (targetRes === "720") bitrate = 2500;
-    else if (targetRes === "480") bitrate = 1000;
-    else bitrate = 500;
-
-    const sizeInBytes = (bitrate * 1000 * duration) / 8;
-    return sizeInBytes < 1024 * 1024
-      ? (sizeInBytes / 1024).toFixed(0) + " KB"
-      : (sizeInBytes / (1024 * 1024)).toFixed(1) + " MB";
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (selected) {
+      setFile(selected);
+      setResultUrl(null);
+      setProgress(0);
+    }
   };
 
   const runVideoProcess = async () => {
-    // Jika belum ready, coba muat ulang mesin secara otomatis
-    if (status !== "ready") {
-      await loadFFmpeg();
-      if (status !== "ready") return;
-    }
-
-    if (!file) return;
+    if (status !== "ready" || !file) return;
 
     const ffmpeg = ffmpegRef.current;
     try {
       setStatus("processing");
       setProgress(0);
 
-      // Bersihkan file lama (abaikan jika error)
-      try {
-        await ffmpeg.deleteFile("input");
-        await ffmpeg.deleteFile("output.mp4");
-      } catch (e) {}
-
+      // 1. Tulis file ke memori virtual FFmpeg
       const fileData = await fetchFile(file);
-      await ffmpeg.writeFile("input", fileData);
+      await ffmpeg.writeFile("input_video", fileData);
 
-      // Jalankan perintah resize
+      // 2. Jalankan perintah Resize & Kompresi
+      // -vf scale=-2:targetRes (Mengubah resolusi sambil menjaga aspek rasio)
+      // -crf 28 (Mengecilkan ukuran file dengan tetap menjaga kualitas)
+      // -preset ultrafast (Agar proses di browser tidak terlalu lama)
       await ffmpeg.exec([
         "-i",
-        "input",
+        "input_video",
         "-vf",
         `scale=-2:${targetRes}`,
-        "-c:v",
+        "-vcodec",
         "libx264",
+        "-crf",
+        "28",
         "-preset",
         "ultrafast",
-        "-crf",
-        "28", // Sedikit lebih berkualitas dari 30
-        "-c:a",
-        "copy",
         "output.mp4",
       ]);
 
+      // 3. Baca hasil dari memori virtual
       const data = await ffmpeg.readFile("output.mp4");
       const url = URL.createObjectURL(
         new Blob([data.buffer], { type: "video/mp4" }),
@@ -147,238 +106,103 @@ const VideoStudio = ({ onBack }) => {
 
   return (
     <div
-      className="studio-container"
       style={{
-        padding: "15px",
-        maxWidth: "1200px",
+        padding: "20px",
+        color: "white",
+        maxWidth: "600px",
         margin: "0 auto",
-        boxSizing: "border-box",
       }}
     >
       <button
         onClick={onBack}
-        className="backBtn"
-        style={{
-          border: "1px solid #71b280",
-          color: "#71b280",
-          background: "none",
-          padding: "8px 15px",
-          borderRadius: "10px",
-          cursor: "pointer",
-          marginBottom: "20px",
-        }}
+        style={{ marginBottom: "20px", cursor: "pointer" }}
       >
         ← Kembali
       </button>
 
-      <h2
-        style={{ color: "#f9d423", textAlign: "center", marginBottom: "30px" }}
-      >
-        Video Studio offline 🎬
-      </h2>
-
       <div
         style={{
-          display: "flex",
-          flexDirection: file && !isMobile ? "row" : "column",
-          gap: "20px",
-          alignItems: "stretch",
+          background: "#222",
+          padding: "30px",
+          borderRadius: "15px",
+          textAlign: "center",
         }}
       >
-        {/* Panel Kiri: Preview/Input */}
-        <div
-          className="glass-card"
-          style={{
-            flex: 1,
-            padding: "20px",
-            borderRadius: "25px",
-            background: "rgba(255,255,255,0.05)",
-            backdropFilter: "blur(15px)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            textAlign: "center",
-            minWidth: 0,
-          }}
-        >
-          {!file ? (
-            <div
-              style={{
-                border: "2px dashed #40798c",
-                padding: "60px 20px",
-                borderRadius: "20px",
-                position: "relative",
-              }}
-            >
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleFileChange}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  opacity: 0,
-                  cursor: "pointer",
-                }}
-              />
-              <p style={{ fontSize: "40px", margin: 0 }}>📹</p>
-              <p style={{ color: "#afeeee" }}>Pilih Video untuk Resize</p>
-            </div>
-          ) : (
-            <div style={{ width: "100%" }}>
-              {resultUrl ? (
-                <video
-                  src={resultUrl}
-                  controls
-                  style={{
-                    width: "100%",
-                    borderRadius: "15px",
-                    maxHeight: "400px",
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    padding: "30px",
-                    background: "rgba(0,0,0,0.2)",
-                    borderRadius: "20px",
-                  }}
-                >
-                  <p style={{ color: "white", wordBreak: "break-all" }}>
-                    📺 {file.name}
-                  </p>
-                  {status === "processing" && (
-                    <div style={{ marginTop: "20px" }}>
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "8px",
-                          background: "#0b2027",
-                          borderRadius: "4px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${progress}%`,
-                            height: "100%",
-                            background: "#f9d423",
-                            transition: "width 0.3s",
-                          }}
-                        />
-                      </div>
-                      <p
-                        style={{
-                          color: "#f9d423",
-                          marginTop: "10px",
-                          fontSize: "0.9rem",
-                        }}
-                      >
-                        Memproses: {progress}%
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <h2>Video Compressor (Client-Side)</h2>
+        <p style={{ fontSize: "0.9rem", color: "#aaa" }}>
+          Data diolah di perangkatmu, aman & privat.
+        </p>
 
-        {/* Panel Kanan: Kontrol */}
-        {file && (
+        {!file ? (
           <div
-            className="glass-card"
             style={{
-              width: isMobile ? "100%" : "350px",
-              padding: "20px",
-              borderRadius: "25px",
-              background: "rgba(255,255,255,0.08)",
-              backdropFilter: "blur(15px)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "20px",
-              boxSizing: "border-box",
+              border: "2px dashed #444",
+              padding: "40px",
+              borderRadius: "10px",
             }}
           >
-            <h3 style={{ margin: 0, color: "#f9d423", fontSize: "1.1rem" }}>
-              ⚙️ Kontrol Video
-            </h3>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={handleFileChange}
+              id="videoInput"
+              hidden
+            />
+            <label
+              htmlFor="videoInput"
+              style={{ cursor: "pointer", color: "#3a86ff" }}
+            >
+              Pilih Video untuk Mulai
+            </label>
+          </div>
+        ) : (
+          <div>
+            <p>Video: {file.name}</p>
 
-            <div style={{ textAlign: "left" }}>
-              <label style={{ fontSize: "0.8rem", color: "#afeeee" }}>
-                Target Resolusi:
-              </label>
+            <div style={{ margin: "20px 0" }}>
+              <label>Pilih Resolusi Akhir: </label>
               <select
                 value={targetRes}
                 onChange={(e) => setTargetRes(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  marginTop: "8px",
-                  borderRadius: "12px",
-                  background: "#0b2027",
-                  color: "white",
-                  border: "1px solid #40798c",
-                }}
+                disabled={status === "processing"}
+                style={{ padding: "5px", borderRadius: "5px" }}
               >
-                <option value="720">720p (HD) - Bagus</option>
-                <option value="480">480p (SD) - Cepat</option>
-                <option value="360">360p (Kecil) - Kilat</option>
+                <option value="480">480p (Paling Kecil)</option>
+                <option value="720">720p (HD)</option>
+                <option value="1080">1080p (Full HD)</option>
               </select>
             </div>
 
-            <div
-              style={{
-                background: "rgba(249, 212, 35, 0.1)",
-                padding: "15px",
-                borderRadius: "15px",
-                border: "1px solid rgba(249, 212, 35, 0.2)",
-                textAlign: "center",
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "0.8rem",
-                  color: "white",
-                  opacity: 0.8,
-                }}
-              >
-                Estimasi Ukuran Akhir:
-              </p>
-              <p
-                style={{
-                  margin: "5px 0 0",
-                  fontSize: "1.4rem",
-                  fontWeight: "bold",
-                  color: "#f9d423",
-                }}
-              >
-                ~{getEstimateSize()}
-              </p>
-            </div>
-
-            {status === "done" ? (
-              <a
-                href={resultUrl}
-                download={`artup-video-${Date.now()}.mp4`}
-                style={{
-                  background: "#71b280",
-                  color: "#0b2027",
-                  textDecoration: "none",
-                  textAlign: "center",
-                  padding: "15px",
-                  borderRadius: "12px",
-                  fontWeight: "bold",
-                  fontSize: "1rem",
-                }}
-              >
-                DOWNLOAD HASIL ✅
-              </a>
+            {status === "done" && resultUrl ? (
+              <div style={{ marginTop: "20px" }}>
+                <p style={{ color: "#4cc9f0" }}>✅ Berhasil Dikecilkan!</p>
+                <video
+                  src={resultUrl}
+                  controls
+                  style={{ width: "100%", borderRadius: "10px" }}
+                />
+                <br />
+                <a
+                  href={resultUrl}
+                  download={`ARTUP_resized_${file.name}`}
+                  style={{
+                    display: "inline-block",
+                    marginTop: "15px",
+                    padding: "10px 20px",
+                    background: "#4cc9f0",
+                    color: "black",
+                    borderRadius: "8px",
+                    textDecoration: "none",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Download Hasil ⬇️
+                </a>
+              </div>
             ) : (
               <button
                 onClick={runVideoProcess}
-                // Tombol HANYA mati jika sedang loading atau sedang memproses
-                disabled={status === "loading" || status === "processing"}
+                disabled={status !== "ready" || status === "processing"}
                 style={{
                   background:
                     status === "loading" || status === "processing"
@@ -386,22 +210,21 @@ const VideoStudio = ({ onBack }) => {
                       : "#3a86ff",
                   color: "white",
                   border: "none",
-                  padding: "15px",
+                  padding: "15px 30px",
                   borderRadius: "12px",
-                  fontWeight: "bold",
                   cursor:
                     status === "loading" || status === "processing"
                       ? "not-allowed"
                       : "pointer",
-                  opacity:
-                    status === "processing" || status === "loading" ? 0.6 : 1,
-                  fontSize: "1rem",
+                  fontWeight: "bold",
+                  width: "100%",
+                  marginTop: "10px",
                 }}
               >
                 {status === "loading"
                   ? "Menyiapkan Mesin..."
                   : status === "processing"
-                    ? `Mengecilkan (${progress}%)`
+                    ? `Memproses... (${progress}%)`
                     : "MULAI RESIZE ⚡"}
               </button>
             )}
@@ -409,19 +232,18 @@ const VideoStudio = ({ onBack }) => {
             <button
               onClick={() => {
                 setFile(null);
-                setResultUrl(null);
                 setStatus("ready");
+                setResultUrl(null);
               }}
               style={{
+                marginTop: "20px",
                 background: "none",
                 border: "none",
                 color: "#ff6b6b",
-                textDecoration: "underline",
                 cursor: "pointer",
-                fontSize: "0.85rem",
               }}
             >
-              Batal & Ganti Video
+              Ganti Video
             </button>
           </div>
         )}
