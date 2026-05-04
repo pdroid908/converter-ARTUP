@@ -3,8 +3,6 @@ import ImageStudio from "./components/ImageStudio";
 import { Analytics } from "@vercel/analytics/react";
 import "./App.css"; // Pastikan CSS diimport
 import AudioStudio from "./components/AudioStudio";
-import VideoStudio from "./components/VideoStudio";
-
 
 // Tambahkan daftar web kamu di sini agar mudah dikelola
 const MY_PROJECTS = [
@@ -96,14 +94,7 @@ const MenuUtama = ({ setMode }) => (
         </p>
       </div>
 
-      {/* Audio Studio Card (Baru) */}
-      <div className="menu-card" onClick={() => setMode("video")}>
-        <span className="icon">🎬</span>
-        <h2 style={{ color: "white", margin: "0 0 10px" }}>Video Studio</h2>
-        <p style={{ color: "#afeeee", opacity: 0.8, fontSize: "0.9rem" }}>
-          Resize video tanpa memakan data
-        </p>
-      </div>
+      
     </div>
   </div>
 );
