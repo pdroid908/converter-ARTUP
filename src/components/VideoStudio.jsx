@@ -137,9 +137,12 @@ const VideoStudio = ({ onBack }) => {
       setResultUrl(url);
       setStatus("done");
     } catch (err) {
-      console.error("Proses gagal:", err);
-      alert("Gagal memproses video. Pastikan koneksi stabil.");
-      setStatus("ready");
+      console.error("Gagal muat FFmpeg:", err);
+      // Jika gagal karena CSP, berikan notifikasi ke user
+      if (err.message.includes("Content Security Policy")) {
+        alert("Gagal memuat mesin karena kebijakan keamanan browser (CSP).");
+      }
+      setStatus("idle");
     }
   };
 
