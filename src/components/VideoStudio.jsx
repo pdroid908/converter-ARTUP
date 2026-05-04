@@ -20,20 +20,19 @@ const VideoStudio = ({ onBack }) => {
 
   const loadFFmpeg = async () => {
     if (status === "ready") return;
+
     try {
       setStatus("loading");
       const ffmpeg = ffmpegRef.current;
 
-      // KEMBALI KE CDN tapi dengan toBlobURL yang benar agar tembus CSP
+      // Gunakan JSDelivr tapi arahkan ke versi UMD agar lebih stabil di browser
       const baseURL =
-        "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
+        "https://cdn.jsdelivr.net/npm/@ffmpeg/core-umd@0.12.6/dist";
 
       ffmpeg.on("log", ({ message }) => console.log(message));
-      ffmpeg.on("progress", ({ progress }) =>
-        setProgress(Math.round(progress * 100)),
-      );
 
       await ffmpeg.load({
+        // Kita gunakan toBlobURL agar skrip dari CDN ini dianggap sebagai 'lokal' oleh browser
         coreURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.js`,
           "text/javascript",
@@ -45,12 +44,11 @@ const VideoStudio = ({ onBack }) => {
       });
 
       setStatus("ready");
+      console.log("ARTUP Mesin Siap!");
     } catch (err) {
       console.error("Gagal muat FFmpeg:", err);
       setStatus("idle");
-      alert(
-        "Mesin gagal siap. Gunakan Chrome/Edge dan pastikan internet stabil.",
-      );
+      alert("Gagal koneksi ke mesin FFmpeg. Coba gunakan Google Chrome.");
     }
   };
 
