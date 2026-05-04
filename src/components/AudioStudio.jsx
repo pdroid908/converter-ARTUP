@@ -1,8 +1,6 @@
 import React, { useState, useRef } from "react";
 
 
-// Tambahkan ini tepat di bawah import lamejs
-
 const AudioStudio = ({ onBack }) => {
   const [file, setFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -57,19 +55,22 @@ const AudioStudio = ({ onBack }) => {
       const arrayBuffer = await file.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      let blob;
-      if (format === "audio/wav") {
-        blob = bufferToWav(audioBuffer);
+      let blob =
+        format === "audio/wav"
+          ? bufferToWav(audioBuffer)
+          : bufferToMp3(audioBuffer);
+
+      // CEK DISINI: Jangan jalankan createObjectURL jika blob null
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
       } else {
-        // PROSES MP3 SUNGGUHAN
-        blob = bufferToMp3(audioBuffer);
+        alert("Gagal membuat file audio. Cek konsol browser.");
       }
 
-      const url = URL.createObjectURL(blob);
-      setAudioUrl(url);
       setIsProcessing(false);
     } catch (error) {
-      console.error(error);
+      console.error("Proses audio gagal:", error);
       alert("Gagal memproses audio.");
       setIsProcessing(false);
     }
@@ -123,7 +124,8 @@ const AudioStudio = ({ onBack }) => {
     }
     return new Blob([buffer], { type: "audio/wav" });
   };
-  // Gunakan pengecekan window untuk mengambil library dari CDN
+
+  // 1. Tambahkan fungsi helper ini
   const getLame = () => {
     if (typeof window !== "undefined" && window.lamejs) {
       return window.lamejs;
@@ -131,25 +133,31 @@ const AudioStudio = ({ onBack }) => {
     return null;
   };
 
+  // 2. Gunakan fungsi bufferToMp3 yang sudah diperbaiki total
   const bufferToMp3 = (audioBuffer) => {
-    const lame = getLame();
+    // Langsung ambil dari window, jangan pakai helper lain
+    const lame = window.lamejs;
+
     if (!lame) {
-      alert("Library pemroses MP3 belum siap. Silakan refresh.");
+      alert("Library MP3 gagal dimuat dari folder public. Cek index.html!");
       return null;
     }
+
+    // Pancingan variabel global untuk library lamejs
+    window.MPEGMode = { STEREO: 0, JOINT_STEREO: 1, DUAL_CHANNEL: 2, MONO: 3 };
+    window.Lame = lame.Lame;
 
     const channels = audioBuffer.numberOfChannels;
     const sampleRate = audioBuffer.sampleRate;
     const kbps = Math.round(128 + 192 * parseFloat(quality));
 
-    // Inisialisasi menggunakan objek global
     const mp3encoder = new lame.Mp3Encoder(channels, sampleRate, kbps);
     const mp3Data = [];
 
-    const floatToInt16 = (floatSamples) => {
-      const int16 = new Int16Array(floatSamples.length);
-      for (let i = 0; i < floatSamples.length; i++) {
-        let s = Math.max(-1, Math.min(1, floatSamples[i]));
+    const floatToInt16 = (samples) => {
+      const int16 = new Int16Array(samples.length);
+      for (let i = 0; i < samples.length; i++) {
+        let s = Math.max(-1, Math.min(1, samples[i]));
         int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
       }
       return int16;
@@ -159,23 +167,19 @@ const AudioStudio = ({ onBack }) => {
     const right =
       channels > 1 ? floatToInt16(audioBuffer.getChannelData(1)) : left;
 
-    const sampleBlockSize = 1152;
-    for (let i = 0; i < left.length; i += sampleBlockSize) {
-      const leftChunk = left.subarray(i, i + sampleBlockSize);
-      const rightChunk = right.subarray(i, i + sampleBlockSize);
-
-      let mp3buf;
-      if (channels === 2) {
-        mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
-      } else {
-        mp3buf = mp3encoder.encodeBuffer(leftChunk);
-      }
-
+    const blockSize = 1152;
+    for (let i = 0; i < left.length; i += blockSize) {
+      const leftChunk = left.subarray(i, i + blockSize);
+      const rightChunk = right.subarray(i, i + blockSize);
+      let mp3buf =
+        channels === 2
+          ? mp3encoder.encodeBuffer(leftChunk, rightChunk)
+          : mp3encoder.encodeBuffer(leftChunk);
       if (mp3buf.length > 0) mp3Data.push(mp3buf);
     }
 
-    const mp3buf = mp3encoder.flush();
-    if (mp3buf.length > 0) mp3Data.push(mp3buf);
+    const flush = mp3encoder.flush();
+    if (flush.length > 0) mp3Data.push(flush);
 
     return new Blob(mp3Data, { type: "audio/mp3" });
   };
@@ -465,6 +469,6 @@ const AudioStudio = ({ onBack }) => {
       </div>
     </div>
   );
-};;
+};;;
 
 export default AudioStudio;
