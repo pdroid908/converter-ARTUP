@@ -43,7 +43,8 @@ const VideoStudio = ({ onBack }) => {
  };
 
   const loadFFmpeg = async () => {
-    if (status === "loading" || status === "ready") return;
+    // Jika sudah ready, jangan muat ulang
+    if (status === "ready") return;
 
     try {
       setStatus("loading");
@@ -51,15 +52,14 @@ const VideoStudio = ({ onBack }) => {
       const baseURL =
         "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
 
-      ffmpeg.on("log", ({ message }) => console.log("FFmpeg:", message));
-      ffmpeg.on("progress", ({ progress }) =>
-        setProgress(Math.round(progress * 100)),
-      );
+      // Gunakan listener untuk memantau jika ada error internal
+      ffmpeg.on("log", ({ message }) => console.log("FFmpeg Log:", message));
 
-      // PERBAIKAN: Langsung arahkan coreURL ke link CDN (tanpa toBlobURL)
-      // agar browser bisa mengenalinya sebagai module
       await ffmpeg.load({
-        coreURL: `${baseURL}/ffmpeg-core.js`,
+        coreURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.js`,
+          "text/javascript",
+        ),
         wasmURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.wasm`,
           "application/wasm",
@@ -67,9 +67,13 @@ const VideoStudio = ({ onBack }) => {
       });
 
       setStatus("ready");
+      console.log("Mesin FFmpeg Siap!");
     } catch (err) {
       console.error("Gagal muat FFmpeg:", err);
-      setStatus("idle");
+      setStatus("idle"); // Kembali ke idle agar bisa dicoba lagi
+      alert(
+        "Gagal menyiapkan mesin. Pastikan koneksi internet stabil atau coba refresh halaman.",
+      );
     }
   };
 
@@ -88,14 +92,20 @@ const VideoStudio = ({ onBack }) => {
   };
 
   const runVideoProcess = async () => {
-    if (!file || status !== "ready") return; // Pastikan status sudah ready
+    // Jika belum ready, coba muat ulang mesin secara otomatis
+    if (status !== "ready") {
+      await loadFFmpeg();
+      if (status !== "ready") return;
+    }
+
+    if (!file) return;
 
     const ffmpeg = ffmpegRef.current;
     try {
       setStatus("processing");
       setProgress(0);
 
-      // PENTING: Hapus file lama di memori FFmpeg agar tidak Error "File already exists"
+      // Bersihkan file lama (abaikan jika error)
       try {
         await ffmpeg.deleteFile("input");
         await ffmpeg.deleteFile("output.mp4");
@@ -104,7 +114,7 @@ const VideoStudio = ({ onBack }) => {
       const fileData = await fetchFile(file);
       await ffmpeg.writeFile("input", fileData);
 
-      // Gunakan settingan yang lebih stabil untuk browser
+      // Jalankan perintah resize
       await ffmpeg.exec([
         "-i",
         "input",
@@ -115,7 +125,7 @@ const VideoStudio = ({ onBack }) => {
         "-preset",
         "ultrafast",
         "-crf",
-        "30",
+        "28", // Sedikit lebih berkualitas dari 30
         "-c:a",
         "copy",
         "output.mp4",
@@ -129,12 +139,9 @@ const VideoStudio = ({ onBack }) => {
       setResultUrl(url);
       setStatus("done");
     } catch (err) {
-      console.error("Gagal muat FFmpeg:", err);
-      // Jika gagal karena CSP, berikan notifikasi ke user
-      if (err.message.includes("Content Security Policy")) {
-        alert("Gagal memuat mesin karena kebijakan keamanan browser (CSP).");
-      }
-      setStatus("idle");
+      console.error("Proses Gagal:", err);
+      alert("Terjadi kesalahan saat memproses video.");
+      setStatus("ready");
     }
   };
 
