@@ -4,29 +4,36 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
 const VideoStudio = ({ onBack }) => {
   const [file, setFile] = useState(null);
-  const [status, setStatus] = useState("idle"); // idle, loading, ready, processing, done
+  const [status, setStatus] = useState("idle");
   const [progress, setProgress] = useState(0);
   const [resultUrl, setResultUrl] = useState(null);
-  const [targetRes, setTargetRes] = useState("720"); // Default 720p
+  const [targetRes, setTargetRes] = useState("720");
   const ffmpegRef = useRef(new FFmpeg());
 
   useEffect(() => {
     loadFFmpeg();
+    // Cleanup URL saat komponen tidak lagi digunakan untuk mencegah memory leak
+    return () => {
+      if (resultUrl) URL.revokeObjectURL(resultUrl);
+    };
   }, []);
 
   const loadFFmpeg = async () => {
     if (status === "ready") return;
-
     try {
       setStatus("loading");
       const ffmpeg = ffmpegRef.current;
+
+      // KEMBALI KE CDN tapi dengan toBlobURL yang benar agar tembus CSP
       const baseURL =
         "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
 
       ffmpeg.on("log", ({ message }) => console.log(message));
+      ffmpeg.on("progress", ({ progress }) =>
+        setProgress(Math.round(progress * 100)),
+      );
 
       await ffmpeg.load({
-        // Gunakan 'text/javascript' untuk coreURL agar browser mau mengeksekusi blob-nya
         coreURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.js`,
           "text/javascript",
@@ -41,15 +48,9 @@ const VideoStudio = ({ onBack }) => {
     } catch (err) {
       console.error("Gagal muat FFmpeg:", err);
       setStatus("idle");
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    if (selected) {
-      setFile(selected);
-      setResultUrl(null);
-      setProgress(0);
+      alert(
+        "Mesin gagal siap. Gunakan Chrome/Edge dan pastikan internet stabil.",
+      );
     }
   };
 
@@ -61,17 +62,13 @@ const VideoStudio = ({ onBack }) => {
       setStatus("processing");
       setProgress(0);
 
-      // 1. Tulis file ke memori virtual FFmpeg
       const fileData = await fetchFile(file);
-      await ffmpeg.writeFile("input_video", fileData);
+      await ffmpeg.writeFile("input_file", fileData);
 
-      // 2. Jalankan perintah Resize & Kompresi
-      // -vf scale=-2:targetRes (Mengubah resolusi sambil menjaga aspek rasio)
-      // -crf 28 (Mengecilkan ukuran file dengan tetap menjaga kualitas)
-      // -preset ultrafast (Agar proses di browser tidak terlalu lama)
+      // Perintah resize yang lebih kompatibel
       await ffmpeg.exec([
         "-i",
-        "input_video",
+        "input_file",
         "-vf",
         `scale=-2:${targetRes}`,
         "-vcodec",
@@ -83,17 +80,17 @@ const VideoStudio = ({ onBack }) => {
         "output.mp4",
       ]);
 
-      // 3. Baca hasil dari memori virtual
       const data = await ffmpeg.readFile("output.mp4");
-      const url = URL.createObjectURL(
-        new Blob([data.buffer], { type: "video/mp4" }),
-      );
+
+      // PERBAIKAN DOWNLOAD: Pastikan Blob memiliki Type yang jelas
+      const videoBlob = new Blob([data.buffer], { type: "video/mp4" });
+      const url = URL.createObjectURL(videoBlob);
 
       setResultUrl(url);
       setStatus("done");
     } catch (err) {
       console.error("Proses Gagal:", err);
-      alert("Terjadi kesalahan saat memproses video.");
+      alert("Gagal memproses video. Coba video lain.");
       setStatus("ready");
     }
   };
@@ -107,13 +104,6 @@ const VideoStudio = ({ onBack }) => {
         margin: "0 auto",
       }}
     >
-      <button
-        onClick={onBack}
-        style={{ marginBottom: "20px", cursor: "pointer" }}
-      >
-        ← Kembali
-      </button>
-
       <div
         style={{
           background: "#222",
@@ -122,123 +112,93 @@ const VideoStudio = ({ onBack }) => {
           textAlign: "center",
         }}
       >
-        <h2>Video Compressor (Client-Side)</h2>
-        <p style={{ fontSize: "0.9rem", color: "#aaa" }}>
-          Data diolah di perangkatmu, aman & privat.
-        </p>
+        <h2>ARTUP Video Resizer</h2>
 
-        {!file ? (
-          <div
-            style={{
-              border: "2px dashed #444",
-              padding: "40px",
-              borderRadius: "10px",
-            }}
-          >
-            <input
-              type="file"
-              accept="video/*"
-              onChange={handleFileChange}
-              id="videoInput"
-              hidden
-            />
-            <label
-              htmlFor="videoInput"
-              style={{ cursor: "pointer", color: "#3a86ff" }}
-            >
-              Pilih Video untuk Mulai
-            </label>
-          </div>
-        ) : (
-          <div>
-            <p>Video: {file.name}</p>
-
-            <div style={{ margin: "20px 0" }}>
-              <label>Pilih Resolusi Akhir: </label>
+        {file && status !== "done" && (
+          <div style={{ marginBottom: "20px" }}>
+            <p>
+              Target Resolusi:
               <select
                 value={targetRes}
                 onChange={(e) => setTargetRes(e.target.value)}
-                disabled={status === "processing"}
-                style={{ padding: "5px", borderRadius: "5px" }}
+                style={{ marginLeft: "10px" }}
               >
-                <option value="480">480p (Paling Kecil)</option>
-                <option value="720">720p (HD)</option>
-                <option value="1080">1080p (Full HD)</option>
+                <option value="480">480p</option>
+                <option value="720">720p</option>
+                <option value="1080">1080p</option>
               </select>
-            </div>
+            </p>
+          </div>
+        )}
 
-            {status === "done" && resultUrl ? (
-              <div style={{ marginTop: "20px" }}>
-                <p style={{ color: "#4cc9f0" }}>✅ Berhasil Dikecilkan!</p>
-                <video
-                  src={resultUrl}
-                  controls
-                  style={{ width: "100%", borderRadius: "10px" }}
-                />
-                <br />
-                <a
-                  href={resultUrl}
-                  download={`ARTUP_resized_${file.name}`}
-                  style={{
-                    display: "inline-block",
-                    marginTop: "15px",
-                    padding: "10px 20px",
-                    background: "#4cc9f0",
-                    color: "black",
-                    borderRadius: "8px",
-                    textDecoration: "none",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Download Hasil ⬇️
-                </a>
-              </div>
+        {status === "done" && resultUrl ? (
+          <div>
+            <video
+              src={resultUrl}
+              controls
+              style={{ width: "100%", borderRadius: "10px" }}
+            />
+            <div style={{ marginTop: "20px" }}>
+              {/* LINK DOWNLOAD YANG DIPERBAIKI */}
+              <a
+                href={resultUrl}
+                download={`ARTUP_Resized_${file.name}`}
+                style={{
+                  display: "block",
+                  padding: "15px",
+                  background: "#4cc9f0",
+                  color: "black",
+                  borderRadius: "10px",
+                  textDecoration: "none",
+                  fontWeight: "bold",
+                }}
+              >
+                DOWNLOAD HASIL SEKARANG ⬇️
+              </a>
+              <button
+                onClick={() => {
+                  setFile(null);
+                  setStatus("ready");
+                  setResultUrl(null);
+                }}
+                style={{
+                  marginTop: "15px",
+                  background: "none",
+                  border: "none",
+                  color: "#aaa",
+                  cursor: "pointer",
+                }}
+              >
+                Proses Video Lain
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {!file ? (
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => setFile(e.target.files[0])}
+              />
             ) : (
               <button
                 onClick={runVideoProcess}
-                disabled={status !== "ready" || status === "processing"}
+                disabled={status !== "ready"}
                 style={{
-                  background:
-                    status === "loading" || status === "processing"
-                      ? "#555"
-                      : "#3a86ff",
+                  background: status === "processing" ? "#555" : "#3a86ff",
                   color: "white",
-                  border: "none",
                   padding: "15px 30px",
                   borderRadius: "12px",
-                  cursor:
-                    status === "loading" || status === "processing"
-                      ? "not-allowed"
-                      : "pointer",
-                  fontWeight: "bold",
                   width: "100%",
-                  marginTop: "10px",
+                  cursor: "pointer",
                 }}
               >
-                {status === "loading"
-                  ? "Menyiapkan Mesin..."
-                  : status === "processing"
-                    ? `Memproses... (${progress}%)`
-                    : "MULAI RESIZE ⚡"}
+                {status === "processing"
+                  ? `Mengecilkan... ${progress}%`
+                  : "MULAI RESIZE"}
               </button>
             )}
-
-            <button
-              onClick={() => {
-                setFile(null);
-                setStatus("ready");
-                setResultUrl(null);
-              }}
-              style={{
-                marginTop: "20px",
-                background: "none",
-                border: "none",
-                color: "#ff6b6b",
-                cursor: "pointer",
-              }}
-            >
-              Ganti Video
-            </button>
           </div>
         )}
       </div>
