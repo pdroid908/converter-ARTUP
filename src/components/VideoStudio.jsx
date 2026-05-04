@@ -16,20 +16,17 @@ const VideoStudio = ({ onBack }) => {
 
   const loadFFmpeg = async () => {
     if (status === "ready") return;
+
     try {
       setStatus("loading");
       const ffmpeg = ffmpegRef.current;
-
-      // Menggunakan CDN jsDelivr yang stabil untuk FFmpeg Core
       const baseURL =
         "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
 
-      ffmpeg.on("log", ({ message }) => console.log("FFmpeg Log:", message));
-      ffmpeg.on("progress", ({ progress }) => {
-        setProgress(Math.round(progress * 100));
-      });
+      ffmpeg.on("log", ({ message }) => console.log(message));
 
       await ffmpeg.load({
+        // Gunakan 'text/javascript' untuk coreURL agar browser mau mengeksekusi blob-nya
         coreURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.js`,
           "text/javascript",
@@ -44,9 +41,6 @@ const VideoStudio = ({ onBack }) => {
     } catch (err) {
       console.error("Gagal muat FFmpeg:", err);
       setStatus("idle");
-      alert(
-        "Gagal menyiapkan mesin browser. Coba refresh atau gunakan Google Chrome.",
-      );
     }
   };
 
