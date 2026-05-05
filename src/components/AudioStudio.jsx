@@ -45,46 +45,42 @@ const AudioStudio = ({ onBack }) => {
   };
 
   const processAudio = async () => {
-    if (!file) return;
-    setIsProcessing(true);
-    setProgress(5); // Start awal
+  if (!file) return;
+  setIsProcessing(true);
+  setProgress(5); 
 
-    try {
-      const audioContext = new (
-        window.AudioContext || window.webkitAudioContext
-      )();
-      const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      setProgress(20); // Selesai decode
+    setProgress(20); 
 
-      // LANGKAH 1: Selalu buat WAV dulu (sebagai Buffer Penengah/Master)
-      const wavBlob = bufferToWav(audioBuffer);
+    // LANGKAH 1: Selalu buat WAV dulu (Master Data)
+    const wavBlob = bufferToWav(audioBuffer);
+    if (format === "audio/wav") {
+      setAudioUrl(URL.createObjectURL(wavBlob));
+      setProgress(100);
+    } else {
+      // LANGKAH 2: Konversi hasil WAV tadi ke MP3
+      // Kita panggil fungsi baru di bawah ini
+      const mp3Blob = await wavToMp3Async(audioBuffer, (p) => {
+        setProgress(20 + Math.floor(p * 0.8));
+      });
 
-      if (format === "audio/wav") {
-        setAudioUrl(URL.createObjectURL(wavBlob));
-        setProgress(100);
+      if (mp3Blob) {
+        setAudioUrl(URL.createObjectURL(mp3Blob));
       } else {
-        // LANGKAH 2: Jika user pilih MP3, konversi dari audioBuffer tadi secara Async
-        const mp3Blob = await bufferToMp3Async(audioBuffer, (p) => {
-          // Kita petakan progress konversi ke visual 20% sampai 100%
-          setProgress(20 + Math.floor(p * 0.8));
-        });
-
-        if (mp3Blob) {
-          setAudioUrl(URL.createObjectURL(mp3Blob));
-        } else {
-          alert("Gagal MP3, menggunakan cadangan WAV.");
-          setAudioUrl(URL.createObjectURL(wavBlob));
-        }
+        setAudioUrl(URL.createObjectURL(wavBlob));
       }
-    } catch (error) {
-      console.error("Proses gagal:", error);
-      alert("Gagal memproses audio.");
-    } finally {
-      setIsProcessing(false);
     }
-  };
+  } catch (error) {
+    console.error("Proses gagal:", error);
+    alert("Gagal memproses audio.");
+  } finally {
+    setIsProcessing(false);
+  }
+};
   const cardStyle = {
     background: "rgba(255,255,255,0.05)",
     padding: "20px",
@@ -132,6 +128,56 @@ const AudioStudio = ({ onBack }) => {
       }
     }
     return new Blob([buffer], { type: "audio/wav" });
+  };
+
+
+  const wavToMp3Async = async (audioBuffer, onProgress) => {
+    const lame = window.lamejs;
+    if (!lame) return null;
+
+    const channels = audioBuffer.numberOfChannels;
+    const kbps = Math.round(128 + 192 * parseFloat(quality));
+    const mp3encoder = new lame.Mp3Encoder(
+      channels,
+      audioBuffer.sampleRate,
+      kbps,
+    );
+    const mp3Data = [];
+
+    const floatToInt16 = (samples) => {
+      const int16 = new Int16Array(samples.length);
+      for (let i = 0; i < samples.length; i++) {
+        let s = Math.max(-1, Math.min(1, samples[i]));
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      return int16;
+    };
+
+    const left = floatToInt16(audioBuffer.getChannelData(0));
+    const right =
+      channels > 1 ? floatToInt16(audioBuffer.getChannelData(1)) : left;
+
+    const blockSize = 1152;
+    for (let i = 0; i < left.length; i += blockSize) {
+      const leftChunk = left.subarray(i, i + blockSize);
+      const rightChunk = right.subarray(i, i + blockSize);
+      let mp3buf =
+        channels === 2
+          ? mp3encoder.encodeBuffer(leftChunk, rightChunk)
+          : mp3encoder.encodeBuffer(leftChunk);
+
+      if (mp3buf.length > 0) mp3Data.push(mp3buf);
+
+      if (i % (blockSize * 100) === 0) {
+        onProgress(Math.round((i / left.length) * 100));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    const flush = mp3encoder.flush();
+    if (flush.length > 0) mp3Data.push(flush);
+    onProgress(100);
+    return new Blob(mp3Data, { type: "audio/mp3" });
   };
 
   // 1. Tambahkan fungsi helper ini
