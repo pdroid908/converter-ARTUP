@@ -3,7 +3,7 @@ import ImageStudio from "./components/ImageStudio";
 import { Analytics } from "@vercel/analytics/react";
 import "./App.css"; // Pastikan CSS diimport
 import AudioStudio from "./components/AudioStudio";
-
+import AudioEnhancer from "./components/AudioEnhancer.jsx";
 // Tambahkan daftar web kamu di sini agar mudah dikelola
 const MY_PROJECTS = [
   {
@@ -76,6 +76,7 @@ const MenuUtama = ({ setMode }) => (
     </div>
 
     {/* Menu Utama Grid */}
+
     <div className="menu-grid">
       <div className="menu-card" onClick={() => setMode("image")}>
         <span className="icon">🖼️</span>
@@ -94,7 +95,13 @@ const MenuUtama = ({ setMode }) => (
         </p>
       </div>
 
-      
+      <div className="menu-card" onClick={() => setMode("audiopro")}>
+        <span className="icon">🎵</span>
+        <h2 style={{ color: "white", margin: "0 0 10px" }}>Audio Booster</h2>
+        <p style={{ color: "#afeeee", opacity: 0.8, fontSize: "0.9rem" }}>
+          Besarkan dan jernihkan volume
+        </p>
+      </div>
     </div>
   </div>
 );
@@ -140,7 +147,7 @@ export default function App() {
       {mode === "menu" && <MenuUtama setMode={setMode} />}
       {mode === "image" && <ImageStudio onBack={() => setMode("menu")} />}
       {mode === "audio" && <AudioStudio onBack={() => setMode("menu")} />}
-      {mode === "video" && <VideoStudio onBack={() => setMode("menu")} />}
+      {mode === "audiopro" && <AudioEnhancer onBack={() => setMode("menu")} />}
     </div>
   );
 }
