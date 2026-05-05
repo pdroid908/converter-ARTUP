@@ -1,21 +1,19 @@
-import React, { useState, useRef } from "react";
-
+import React, { useState } from "react";
 
 const AudioStudio = ({ onBack }) => {
   const [file, setFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
-  const [format, setFormat] = useState("audio/wav"); // Default ke WAV (mudah)
-  const [quality, setQuality] = useState(0.8); // Skala 0.1 - 1.0
   const [duration, setDuration] = useState(0);
-  const [progress, setProgress] = useState(0); // <-- TAMBAHKAN INI
+  const [progress, setProgress] = useState(0);
+
+  // ... (Logika handleFileChange, getEstimateSize, processAudio, bufferToWav tetap sama) ...
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile && selectedFile.type.startsWith("video/")) {
       setFile(selectedFile);
       setAudioUrl(null);
-
-      // Ambil durasi video untuk estimasi ukuran
+      setProgress(0);
       const video = document.createElement("video");
       video.preload = "metadata";
       video.onloadedmetadata = () => setDuration(video.duration);
@@ -23,76 +21,36 @@ const AudioStudio = ({ onBack }) => {
     }
   };
 
-  // Logika Estimasi Ukuran File
   const getEstimateSize = () => {
     if (!duration) return "0 KB";
-
-    let sizeInBytes;
-    if (format === "audio/wav") {
-      // WAV: SampleRate * Channels * BitDepth * Duration
-      // Asumsi standar: 44100 * 2 * 2 (16bit)
-      sizeInBytes = 44100 * 2 * 2 * duration;
-    } else {
-      // MP3 (Simulasi): Bitrate (kbps) * Duration / 8
-      // Bitrate dinamis berdasarkan slider quality (128kbps - 320kbps)
-      const bitrate = 128 + 192 * quality;
-      sizeInBytes = (bitrate * 1000 * duration) / 8;
-    }
-
+    const sizeInBytes = 44100 * 2 * 2 * duration;
     return sizeInBytes < 1024 * 1024
       ? (sizeInBytes / 1024).toFixed(0) + " KB"
       : (sizeInBytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   const processAudio = async () => {
-  if (!file) return;
-  setIsProcessing(true);
-  setProgress(5); 
-
-  try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const arrayBuffer = await file.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-    setProgress(20); 
-
-    // LANGKAH 1: Selalu buat WAV dulu (Master Data)
-    const wavBlob = bufferToWav(audioBuffer);
-    if (format === "audio/wav") {
+    if (!file) return;
+    setIsProcessing(true);
+    setProgress(10);
+    try {
+      const audioContext = new (
+        window.AudioContext || window.webkitAudioContext
+      )();
+      const arrayBuffer = await file.arrayBuffer();
+      setProgress(30);
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      setProgress(60);
+      const wavBlob = bufferToWav(audioBuffer);
       setAudioUrl(URL.createObjectURL(wavBlob));
       setProgress(100);
-    } else {
-      // LANGKAH 2: Konversi hasil WAV tadi ke MP3
-      // Kita panggil fungsi baru di bawah ini
-      const mp3Blob = await wavToMp3Async(audioBuffer, (p) => {
-        setProgress(20 + Math.floor(p * 0.8));
-      });
-
-      if (mp3Blob) {
-        setAudioUrl(URL.createObjectURL(mp3Blob));
-      } else {
-        setAudioUrl(URL.createObjectURL(wavBlob));
-      }
+    } catch (error) {
+      alert("Gagal mengekstrak audio.");
+    } finally {
+      setIsProcessing(false);
     }
-  } catch (error) {
-    console.error("Proses gagal:", error);
-    alert("Gagal memproses audio.");
-  } finally {
-    setIsProcessing(false);
-  }
-};
-  const cardStyle = {
-    background: "rgba(255,255,255,0.05)",
-    padding: "20px",
-    borderRadius: "25px",
-    backdropFilter: "blur(15px)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    boxSizing: "border-box",
-    width: "100%", // Pastikan selalu 100% dari parent
-    minWidth: 0, // Mencegah flex/grid memaksanya melebar
   };
 
-  // Helper WAV (Sama seperti sebelumnya)
   const bufferToWav = (abuffer) => {
     let numOfChan = abuffer.numberOfChannels,
       length = abuffer.length * numOfChan * 2 + 44,
@@ -130,116 +88,35 @@ const AudioStudio = ({ onBack }) => {
     return new Blob([buffer], { type: "audio/wav" });
   };
 
-
-  const wavToMp3Async = async (audioBuffer, onProgress) => {
-    const lame = window.lamejs;
-    if (!lame) return null;
-
-    const channels = audioBuffer.numberOfChannels;
-    const kbps = Math.round(128 + 192 * parseFloat(quality));
-    const mp3encoder = new lame.Mp3Encoder(
-      channels,
-      audioBuffer.sampleRate,
-      kbps,
-    );
-    const mp3Data = [];
-
-    const floatToInt16 = (samples) => {
-      const int16 = new Int16Array(samples.length);
-      for (let i = 0; i < samples.length; i++) {
-        let s = Math.max(-1, Math.min(1, samples[i]));
-        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-      }
-      return int16;
-    };
-
-    const left = floatToInt16(audioBuffer.getChannelData(0));
-    const right =
-      channels > 1 ? floatToInt16(audioBuffer.getChannelData(1)) : left;
-
-    const blockSize = 1152;
-    for (let i = 0; i < left.length; i += blockSize) {
-      const leftChunk = left.subarray(i, i + blockSize);
-      const rightChunk = right.subarray(i, i + blockSize);
-      let mp3buf =
-        channels === 2
-          ? mp3encoder.encodeBuffer(leftChunk, rightChunk)
-          : mp3encoder.encodeBuffer(leftChunk);
-
-      if (mp3buf.length > 0) mp3Data.push(mp3buf);
-
-      if (i % (blockSize * 100) === 0) {
-        onProgress(Math.round((i / left.length) * 100));
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-    }
-
-    const flush = mp3encoder.flush();
-    if (flush.length > 0) mp3Data.push(flush);
-    onProgress(100);
-    return new Blob(mp3Data, { type: "audio/mp3" });
-  };
-
-  // 1. Tambahkan fungsi helper ini
-  const getLame = () => {
-    if (typeof window !== "undefined" && window.lamejs) {
-      return window.lamejs;
-    }
-    return null;
-  };
-
-  // 2. Gunakan fungsi bufferToMp3 yang sudah diperbaiki total
-  const bufferToMp3Async = async (audioBuffer, onProgress) => {
-    const lame = window.lamejs;
-    if (!lame) return null;
-
-    const channels = audioBuffer.numberOfChannels;
-    const kbps = Math.round(128 + 192 * parseFloat(quality));
-    const mp3encoder = new lame.Mp3Encoder(
-      channels,
-      audioBuffer.sampleRate,
-      kbps,
-    );
-    const mp3Data = [];
-
-    const floatToInt16 = (samples) => {
-      const int16 = new Int16Array(samples.length);
-      for (let i = 0; i < samples.length; i++) {
-        let s = Math.max(-1, Math.min(1, samples[i]));
-        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-      }
-      return int16;
-    };
-
-    const left = floatToInt16(audioBuffer.getChannelData(0));
-    const right =
-      channels > 1 ? floatToInt16(audioBuffer.getChannelData(1)) : left;
-
-    const blockSize = 1152;
-    for (let i = 0; i < left.length; i += blockSize) {
-      const leftChunk = left.subarray(i, i + blockSize);
-      const rightChunk = right.subarray(i, i + blockSize);
-      let mp3buf =
-        channels === 2
-          ? mp3encoder.encodeBuffer(leftChunk, rightChunk)
-          : mp3encoder.encodeBuffer(leftChunk);
-
-      if (mp3buf.length > 0) mp3Data.push(mp3buf);
-
-      // Update progress setiap 100 blok
-      if (i % (blockSize * 100) === 0) {
-        onProgress(Math.round((i / left.length) * 100));
-        await new Promise((resolve) => setTimeout(resolve, 0)); // Cegah Freeze
-      }
-    }
-
-    const flush = mp3encoder.flush();
-    if (flush.length > 0) mp3Data.push(flush);
-    onProgress(100);
-    return new Blob(mp3Data, { type: "audio/mp3" });
-  };
   return (
-    <div className="studio-container">
+    <div
+      className="studio-container"
+      style={{ padding: "10px", maxWidth: "1000px", margin: "0 auto" }}
+    >
+      <style>{`
+        .responsive-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        @media (min-width: 850px) {
+          .responsive-grid {
+            grid-template-columns: ${file ? "1fr 350px" : "1fr"};
+          }
+        }
+        .glass-card {
+          background: rgba(255,255,255,0.05);
+          backdrop-filter: blur(10px);
+          border-radius: 20px;
+          border: 1px solid rgba(255,255,255,0.1);
+          padding: 20px;
+        }
+        @media (max-width: 600px) {
+          h2 { fontSize: "1.5rem" !important; }
+          .dropzone-area { padding: 20px !important; }
+        }
+      `}</style>
+
       <button
         onClick={onBack}
         className="backBtn"
@@ -257,88 +134,41 @@ const AudioStudio = ({ onBack }) => {
       </button>
 
       <h2
-        style={{ color: "#f9d423", textAlign: "center", marginBottom: "30px" }}
+        style={{ color: "#f9d423", textAlign: "center", marginBottom: "10px" }}
       >
-        Audio Studio 🎵
+        Audio Extractor 🎥 No Data Used
       </h2>
 
+      {/* Peringatan Komersial */}
       <div
         style={{
-          marginTop: "50px",
-          padding: "1px", // Ruang untuk gradient border
-          background:
-            "linear-gradient(90deg, transparent, rgba(113, 178, 128, 0.5), transparent)",
-          borderRadius: "20px",
-          width: "fit-content",
-          marginInline: "auto",
-          animation: "pulse 3s infinite", // Menggunakan keyframe pulse yang sudah ada di App.css kamu
-          boxShadow: "0 0 20px rgba(113, 178, 128, 0.1)",
+          background: "rgba(255, 107, 107, 0.1)",
+          border: "1px solid #ff6b6b",
+          padding: "12px",
+          borderRadius: "15px",
+          marginBottom: "25px",
+          textAlign: "center",
         }}
       >
-        <div
-          style={{
-            background: "#0b2027", // Warna dasar gelap webmu
-            padding: "15px 30px",
-            borderRadius: "20px",
-            display: "flex",
-            alignItems: "center",
-            gap: "15px",
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "1.2rem",
-              filter: "drop-shadow(0 0 5px #71b280)",
-            }}
-          >
-            🛡️
-          </span>
-          <p
-            style={{
-              fontSize: "0.75rem",
-              color: "#ffffff",
-              margin: 0,
-              fontWeight: "500",
-              letterSpacing: "0.5px",
-              opacity: 0.8,
-            }}
-          >
-            <span style={{ color: "#71b280", fontWeight: "800" }}>
-              PEMBERITAHUAN:
-            </span>{" "}
-            Kami tidak mendukung penggunaan karya berhak cipta tanpa izin untuk
-            tujuan komersial.
-          </p>
-        </div>
+        <p style={{ color: "#ff6b6b", fontSize: "0.75rem", margin: 0 }}>
+          ⚠️ <strong>ARTUP STUDIO:</strong> Kami tidak mendukung penggunaan
+          karya berhak cipta tanpa izin untuk tujuan komersial.
+        </p>
       </div>
-      <div
-        style={{
-          display: "grid",
-          // Gunakan grid-template-columns otomatis:
-          // Jika layar lebar (>800px) pakai 1fr 350px, jika sempit tumpuk ke bawah
-          gridTemplateColumns: file
-            ? window.innerWidth > 800
-              ? "1fr 350px"
-              : "1fr"
-            : "1fr",
-          gap: "20px",
-          width: "100%",
-          boxSizing: "border-box",
-        }}
-      >
-        {/* Panel Kiri: Input & Preview */}
-        <div
-          className="glass-card"
-          style={{
-            textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-          }}
-        >
+
+      <div className="responsive-grid">
+        {/* Panel Utama */}
+        <div className="glass-card" style={{ textAlign: "center" }}>
           {!file ? (
-            <div className="dropzone-area">
+            <div
+              className="dropzone-area"
+              style={{
+                border: "2px dashed #71b280",
+                borderRadius: "20px",
+                padding: "40px",
+                position: "relative",
+              }}
+            >
               <input
                 type="file"
                 accept="video/*"
@@ -350,72 +180,55 @@ const AudioStudio = ({ onBack }) => {
                   cursor: "pointer",
                 }}
               />
-              <p style={{ fontSize: "40px" }}>🎬</p>
-              <p style={{ color: "#afeeee" }}>
-                Klik/Seret MP4 untuk ambil suaranya
+              <p style={{ fontSize: "30px" }}>📥</p>
+              <p style={{ color: "#afeeee", fontSize: "0.9rem" }}>
+                Klik/Seret Video (WAV)
               </p>
             </div>
           ) : (
-            <div style={{ padding: "20px" }}>
-              <div
+            <div>
+              <p
                 style={{
-                  background: "rgba(0,0,0,0.3)",
-                  padding: "20px",
-                  borderRadius: "20px",
-                  marginBottom: "20px",
+                  color: "white",
+                  fontWeight: "bold",
+                  wordBreak: "break-all",
+                  fontSize: "0.9rem",
                 }}
               >
-                <p style={{ color: "white", fontWeight: "bold" }}>
-                  📹 {file.name}
-                </p>
-                <p style={{ color: "#71b280", fontSize: "0.8rem" }}>
-                  Durasi: {Math.floor(duration)} detik
-                </p>
-
-                {/* TEMPELKAN KODE PROGRESS DI SINI */}
-                {isProcessing && (
-                  <div style={{ marginTop: "20px", textAlign: "left" }}>
-                    <p
-                      style={{
-                        color: "#f9d423",
-                        fontSize: "0.8rem",
-                        marginBottom: "5px",
-                      }}
-                    >
-                      Sedang Mengolah: {progress}%
-                    </p>
+                📹 {file.name}
+              </p>
+              {isProcessing && (
+                <div style={{ marginTop: "20px" }}>
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "6px",
+                      background: "rgba(255,255,255,0.1)",
+                      borderRadius: "10px",
+                    }}
+                  >
                     <div
                       style={{
-                        width: "100%",
-                        height: "8px",
-                        background: "rgba(255,255,255,0.1)",
-                        borderRadius: "10px",
-                        overflow: "hidden",
+                        width: `${progress}%`,
+                        height: "100%",
+                        background: "#71b280",
+                        transition: "width 0.3s",
                       }}
-                    >
-                      <div
-                        style={{
-                          width: `${progress}%`,
-                          height: "100%",
-                          background: "#71b280",
-                          transition: "width 0.3s ease",
-                        }}
-                      ></div>
-                    </div>
+                    ></div>
                   </div>
-                )}
-              </div>
-              {audioUrl && (
-                <div style={{ animation: "fadeIn 0.5s" }}>
                   <p
                     style={{
                       color: "#f9d423",
-                      fontSize: "0.9rem",
-                      marginBottom: "10px",
+                      fontSize: "0.7rem",
+                      marginTop: "10px",
                     }}
                   >
-                    Hasil Konversi:
+                    Processing: {progress}%
                   </p>
+                </div>
+              )}
+              {audioUrl && (
+                <div style={{ marginTop: "20px" }}>
                   <audio src={audioUrl} controls style={{ width: "100%" }} />
                 </div>
               )}
@@ -423,60 +236,18 @@ const AudioStudio = ({ onBack }) => {
           )}
         </div>
 
-        {/* Panel Kanan: Kontrol (Hanya muncul jika file dipilih) */}
+        {/* Panel Kontrol */}
         {file && (
           <div
             className="glass-card"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "20px",
-              textAlign: "left",
-            }}
+            style={{ display: "flex", flexDirection: "column", gap: "15px" }}
           >
-            <h3 style={{ margin: 0, fontSize: "1rem", color: "#f9d423" }}>
-              Pengaturan Audio
+            <h3 style={{ color: "#f9d423", margin: 0, fontSize: "1rem" }}>
+              Detail Output
             </h3>
-
-            <div>
-              <label style={{ fontSize: "0.8rem", color: "#afeeee" }}>
-                Format Output
-              </label>
-              <select
-                value={format}
-                onChange={(e) => setFormat(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  marginTop: "5px",
-                  borderRadius: "10px",
-                  background: "#0b2027",
-                  color: "white",
-                  border: "1px solid #40798c",
-                }}
-              >
-                <option value="audio/wav">
-                  WAV (Kualitas Tinggi / ukuran tetap)
-                </option>
-                <option value="audio/mp3">MP3 (Kecil / Kompresi)</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontSize: "0.8rem", color: "#afeeee" }}>
-                Kualitas ({Math.round(quality * 100)}%)
-              </label>
-              <input
-                type="range"
-                min="0.1"
-                max="1.0"
-                step="0.1"
-                value={quality}
-                onChange={(e) => setQuality(e.target.value)}
-                className="custom-slider"
-                style={{ width: "100%", marginTop: "10px" }}
-              />
-            </div>
+            <p style={{ fontSize: "0.8rem", color: "#afeeee" }}>
+              Format: <strong>WAV (Original)</strong>
+            </p>
 
             <div
               style={{
@@ -486,13 +257,13 @@ const AudioStudio = ({ onBack }) => {
                 border: "1px solid rgba(249, 212, 35, 0.2)",
               }}
             >
-              <p style={{ margin: 0, fontSize: "0.8rem", color: "white" }}>
+              <p style={{ margin: 0, fontSize: "0.7rem", color: "white" }}>
                 Estimasi Ukuran:
               </p>
               <p
                 style={{
                   margin: "5px 0 0",
-                  fontSize: "1.2rem",
+                  fontSize: "1.1rem",
                   fontWeight: "bold",
                   color: "#f9d423",
                 }}
@@ -509,33 +280,33 @@ const AudioStudio = ({ onBack }) => {
                   background: "#3a86ff",
                   color: "white",
                   border: "none",
-                  padding: "15px",
-                  borderRadius: "12px",
+                  padding: "12px",
+                  borderRadius: "10px",
                   fontWeight: "bold",
                   cursor: "pointer",
                 }}
               >
-                {isProcessing ? "MEMPROSES..." : "KONVERSI SEKARANG"}
+                {isProcessing ? "MENGOLAH..." : "MULAI EKSTRAK"}
               </button>
             ) : (
               <a
                 href={audioUrl}
-                download={`artup-${Date.now()}.${format === "audio/wav" ? "wav" : "mp3"}`}
+                download={`artup-extract-${Date.now()}.wav`}
                 className="action-btn"
                 style={{
                   background: "#71b280",
                   color: "#0b2027",
                   textDecoration: "none",
                   textAlign: "center",
-                  padding: "15px",
-                  borderRadius: "12px",
+                  padding: "12px",
+                  borderRadius: "10px",
                   fontWeight: "bold",
+                  fontSize: "0.9rem",
                 }}
               >
-                DOWNLOAD HASIL ✅
+                Save to file ✅
               </a>
             )}
-
             <button
               onClick={() => {
                 setFile(null);
@@ -545,18 +316,17 @@ const AudioStudio = ({ onBack }) => {
                 background: "none",
                 border: "none",
                 color: "#ff6b6b",
-                textDecoration: "underline",
                 cursor: "pointer",
-                fontSize: "0.8rem",
+                fontSize: "0.75rem",
               }}
             >
-              Batal & Ganti Video
+              Ganti Video
             </button>
           </div>
         )}
       </div>
     </div>
   );
-};;;
+};
 
 export default AudioStudio;

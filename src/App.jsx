@@ -3,6 +3,7 @@ import ImageStudio from "./components/ImageStudio";
 import { Analytics } from "@vercel/analytics/react";
 import "./App.css"; // Pastikan CSS diimport
 import AudioStudio from "./components/AudioStudio";
+import TesConverter from "./components/tes";
 
 // Tambahkan daftar web kamu di sini agar mudah dikelola
 const MY_PROJECTS = [
@@ -89,13 +90,20 @@ const MenuUtama = ({ setMode }) => (
       {/* Audio Studio Card (Baru) */}
       <div className="menu-card" onClick={() => setMode("audio")}>
         <span className="icon">🎵</span>
-        <h2 style={{ color: "white", margin: "0 0 10px" }}>Audio Studio</h2>
+        <h2 style={{ color: "white", margin: "0 0 10px" }}>Video to Audio</h2>
         <p style={{ color: "#afeeee", opacity: 0.8, fontSize: "0.9rem" }}>
-          Ekstrak Audio dari Video (MP4 to WAV/mp3)
+          Video to Audio no data used
         </p>
       </div>
 
-      
+      {/* Audio Studio Card (Baru) */}
+      <div className="menu-card" onClick={() => setMode("tes")}>
+        <span className="icon">🎵</span>
+        <h2 style={{ color: "white", margin: "0 0 10px" }}>wav to mp3</h2>
+        <p style={{ color: "#afeeee", opacity: 0.8, fontSize: "0.9rem" }}>
+          Convert wav to mp3 no data used
+        </p>
+      </div>
     </div>
   </div>
 );
@@ -141,7 +149,7 @@ export default function App() {
       {mode === "menu" && <MenuUtama setMode={setMode} />}
       {mode === "image" && <ImageStudio onBack={() => setMode("menu")} />}
       {mode === "audio" && <AudioStudio onBack={() => setMode("menu")} />}
-      
+      {mode === "tes" && <TesConverter onBack={() => setMode("menu")} />}
     </div>
   );
 }
